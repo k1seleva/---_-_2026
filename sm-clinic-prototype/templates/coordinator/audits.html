@@ -1,0 +1,29 @@
+{% extends "workspace/base.html" %}
+{% block title %}Обсуждения рекомендаций{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Маршруты и протоколы</div><h1>Обсуждения рекомендаций</h1></div>
+  <nav class="tabs" style="margin:0;border:0"><a href="?open=1" class="{% if request.GET.open == '1' %}active{% endif %}">Ждут решения</a><a href="?" class="{% if request.GET.open != '1' %}active{% endif %}">Все с замечаниями</a></nav></div>
+<p class="muted">Система сверяет рекомендации врача с показаниями по находкам и с текущим маршрутом. Сюда попадает только то, чего нет ни в рекомендациях, ни в маршруте. Решение принимает координатор вместе с врачом.</p>
+<div class="grid grid-4">
+  {% for v in stats.verdicts %}<div class="kpi-tile"><div class="label">{{ v.title }}</div><div class="value">{{ v.count }}</div></div>{% endfor %}
+</div>
+<div class="card mt">
+  <div class="table-wrap"><table>
+    <thead><tr><th>Дата</th><th>Пациент</th><th>Источник</th><th>Вердикт</th><th>Итог</th><th>Статус</th></tr></thead>
+    {% for a in audits %}<tr class="row-link" data-href="{% url 'coordinator:audit' a.id %}">
+      <td class="nowrap small">{{ a.created_at|date:"d.m H:i" }}</td><td>{{ a.patient_name }}</td><td class="small">{{ a.source_display }}</td>
+      <td><span class="tag {% if a.verdict == 'insufficient' %}amber{% elif a.verdict == 'needs_review' %}blue{% else %}green{% endif %}">{{ a.verdict_display }}</span></td>
+      <td class="small"><a href="{% url 'coordinator:audit' a.id %}">{{ a.summary|truncatechars:140 }}</a></td>
+      <td class="small">{{ a.status_display }}</td></tr>
+    {% empty %}<tr><td colspan="6"><div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Замечаний нет</div></div></td></tr>{% endfor %}
+  </table></div>
+</div>
+<div class="card mt">
+  <h2>Точность правил по решениям координатора</h2>
+  <p class="small muted">Доля принятых предложений. Низкая точность — повод пересмотреть правило матрицы показаний.</p>
+  <div class="table-wrap"><table><thead><tr><th>Правило</th><th class="num">Замечаний</th><th class="num">Принято</th><th class="num">Отклонено</th><th style="width:30%">Точность</th></tr></thead>
+    {% for r in stats.rules %}<tr><td>{{ r.rule_code|human:"indication_rule" }}</td><td class="num">{{ r.total }}</td><td class="num">{{ r.accepted }}</td><td class="num">{{ r.rejected }}</td>
+      <td>{% if r.precision is not None %}<div class="row" style="gap:8px"><div class="meter" style="flex:1;margin:0"><i style="width:{{ r.precision|width:100 }}%"></i></div><b>{{ r.precision }}%</b></div>{% else %}<span class="muted">нет решений</span>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5" class="muted">Нет данных</td></tr>{% endfor %}</table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "workspace/base.html" %}
+{% block title %}Мои приоритеты{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Настройки</div><h1>Мои приоритеты признаков</h1></div></div>
+<div class="note" style="margin-bottom:16px">Система не решает, какой признак важнее. Она только находит и подсвечивает фрагменты протокола. Здесь вы выбираете, что показывать первым в блоке «В фокусе» и в каком порядке. Остальное остаётся на своих местах в порядке протокола: ничего не скрывается. В конкретном протоколе фокус можно поменять фильтрами или закрепить карточку.</div>
+
+<div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);align-items:start">
+  <div class="card">
+    <div class="card-head"><h2>Порядок в фокусе</h2>{% if profile %}<form method="post">{% csrf_token %}<input type="hidden" name="op" value="clear"><button class="btn btn-sm btn-ghost">Очистить</button></form>{% endif %}</div>
+    {% for p in profile %}
+    <div class="list-row"><span class="pill green">{{ forloop.counter }}</span><span class="grow"><b>{{ p.title }}</b></span>
+      <form method="post" class="inline-form">{% csrf_token %}<input type="hidden" name="key" value="{{ p.key }}"><button class="btn btn-sm btn-ghost" name="op" value="up" aria-label="Выше" {% if forloop.first %}disabled{% endif %}>↑</button><button class="btn btn-sm btn-ghost" name="op" value="down" aria-label="Ниже" {% if forloop.last %}disabled{% endif %}>↓</button><button class="btn btn-sm btn-ghost" name="op" value="remove" aria-label="Убрать">{% icon "x" "sm" %}</button></form>
+    </div>
+    {% empty %}<div class="empty"><div class="circle">{% icon "sliders" "lg" %}</div><div class="t">Приоритеты не выбраны</div><div>Протокол показывается в своём порядке: заключение, затем изменения в описании по органам</div></div>{% endfor %}
+  </div>
+  <form class="card" method="post">{% csrf_token %}<input type="hidden" name="op" value="save">
+    <div class="card-head"><h2>Что можно вынести в фокус</h2><button class="btn btn-primary btn-sm">Сохранить</button></div>
+    {% for group, items in groups.items %}
+      <h3 class="mt-s">{{ group }}</h3>
+      <div class="tags" style="gap:8px">{% for i in items %}<label class="fchip{% if i.active %} on{% endif %}" style="margin:0"><input type="checkbox" name="keys" value="{{ i.key }}" {% if i.active %}checked{% endif %}> {{ i.title }}</label>{% endfor %}</div>
+    {% endfor %}
+    <p class="mt"><button class="btn btn-primary">Сохранить приоритеты</button></p>
+  </form>
+</div>
+{% endblock %}

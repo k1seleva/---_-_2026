@@ -1,0 +1,60 @@
+{% extends "workspace/base.html" %}
+{% block title %}Маршрут пациента{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs"><a href="{% url 'coordinator:routes' %}">Маршруты</a>{% if route.source_document_id %} · <a href="{% url 'coordinator:case' route.source_document_id %}">карта протокола</a>{% endif %}</div>
+    <h1>{{ route.reason }}</h1>
+    <div class="muted">{{ patient.display_name }} · {{ route.kind|human:"route_kind" }} · правило «{{ route.trigger_code|human:"trigger" }}»{% if route.rule_version %}, версия {{ route.rule_version }}{% endif %}{% if review %} · разбор: {{ review.get_status_display|lower }}{% endif %}</div></div>
+  <span class="tag {% if route.is_open %}blue{% elif route.status == 'completed' %}green{% else %}gray{% endif %}">{{ route.status|human:"route_status" }}</span>
+</div>
+{% if discrepancies %}<div class="note warn" style="margin-bottom:16px"><b>Расхождения ИИ и врача:</b>{% for d in discrepancies %}<div>• {{ d }}</div>{% endfor %}</div>{% endif %}
+
+<div class="grid grid-2" style="align-items:start">
+  <div class="card">
+    <h2>Что нашла система</h2>
+    {% for m in ai_markers %}<div class="notice"><b>{% if m.negated %}<s>{{ m.label }}</s> <span class="tag gray">отрицание</span>{% else %}{{ m.label }}{% endif %}</b>
+      {% if m.uncertain %} <span class="tag amber">сомнение</span>{% endif %}
+      <div class="quote-src">«{{ m.evidence_quote|truncatechars:200 }}»</div></div>
+    {% empty %}<p class="muted">Нет данных об исследовании.</p>{% endfor %}
+    <h3 class="mt">Этапы, предложенные по правилам</h3>
+    <ol class="small">{% for s in ai_steps %}<li>{{ s.title }}: {{ s.status|human:"step_status" }}</li>{% empty %}<li class="muted">Нет</li>{% endfor %}</ol>
+  </div>
+  <div class="card">
+    <h2>Решение врача и этапы маршрута</h2>
+    {% for t in tactics %}<div class="notice"><b>Тактика: {{ t.tactic|human:"tactic" }}</b>{% for p in t.prescriptions %}<div class="small">• {{ p.title }}</div>{% endfor %}{% if t.comment %}<div class="small muted">{{ t.comment }}</div>{% endif %}</div>{% empty %}<p class="muted">Врач ещё не принимал решение.</p>{% endfor %}
+    <ul class="timeline mt">{% for s in route.steps %}
+      <li class="{% if s.status == 'done' %}done{% elif s.status == 'awaiting_booking' or s.status == 'booked' %}active{% elif s.status == 'skipped' or s.status == 'cancelled' %}skipped{% endif %}"><span class="dot"></span>
+        <b>{{ s.title }}</b>{% if s.specialty_title %} <span class="small muted">· {{ s.specialty_title }}</span>{% endif %} <span class="tag gray">{{ s.source|human:"step_source" }}</span>
+        <div class="small muted">{{ s.status|human:"step_status" }}{% if s.due_date and s.status != 'done' %} · срок до {{ s.due_date|date:"d.m.Y" }}{% endif %}</div>
+        {% if s.status == 'planned' or s.status == 'awaiting_booking' %}
+        <details class="small"><summary>Изменить этап</summary>
+          <form method="post" action="{% url 'coordinator:correct' route.id %}" class="row mt-s">{% csrf_token %}<input type="hidden" name="op" value="change_specialty"><input type="hidden" name="step_id" value="{{ s.id }}">
+            <select name="specialty_code" style="flex:1;width:auto">{% for code, title in specialties.items %}<option value="{{ code }}" {% if code == s.specialty_code %}selected{% endif %}>{{ title }}</option>{% endfor %}</select>
+            <input name="comment" placeholder="Основание" required style="flex:1;width:auto"><button class="btn btn-sm btn-light">Сменить специалиста</button></form>
+          <form method="post" action="{% url 'coordinator:correct' route.id %}" class="row mt-s">{% csrf_token %}<input type="hidden" name="op" value="cancel_step"><input type="hidden" name="step_id" value="{{ s.id }}">
+            <input name="comment" placeholder="Причина отмены" style="flex:1;width:auto" required><button class="btn btn-sm btn-danger">Отменить этап</button></form>
+        </details>{% endif %}
+      </li>{% endfor %}</ul>
+  </div>
+</div>
+
+<div class="card mt">
+  <h2>Добавить этап вручную</h2>
+  <form method="post" action="{% url 'coordinator:correct' route.id %}">{% csrf_token %}
+    <input type="hidden" name="op" value="add_step">
+    <div class="grid grid-3">
+      <div><label for="st">Тип этапа</label><select id="st" name="step_type"><option value="consultation">Консультация</option><option value="diagnostics">Обследование</option><option value="follow_up">Контрольный визит</option></select></div>
+      <div><label for="tt">Название</label><input id="tt" name="title" placeholder="Консультация онколога"></div>
+      <div><label for="sp">Специалист</label><select id="sp" name="specialty_code"><option value="">Не выбран</option>{% for code, title in specialties.items %}<option value="{{ code }}">{{ title }}</option>{% endfor %}</select></div>
+      <div><label for="od">Через, дней</label><input id="od" name="offset_days" type="number" min="0" value="0"></div>
+      <div><label for="cm">Основание</label><input id="cm" name="comment" required placeholder="Почему вносится правка"></div>
+      <div><label><input type="checkbox" name="ai_error"> Ошибка распознавания (уйдёт в разметку для улучшения)</label></div>
+    </div>
+    <p class="mt-s"><button class="btn btn-primary">Добавить этап</button></p>
+  </form>
+  <div class="row">
+    <form method="post" action="{% url 'coordinator:correct' route.id %}">{% csrf_token %}<input type="hidden" name="op" value="confirm"><input type="hidden" name="comment" value="Маршрут врача подтверждён"><button class="btn btn-outline">Подтвердить маршрут врача</button></form>
+    {% if not route.is_open %}<form method="post" action="{% url 'coordinator:correct' route.id %}">{% csrf_token %}<input type="hidden" name="op" value="reopen"><input type="hidden" name="comment" value="Маршрут возвращён в работу координатором"><button class="btn btn-outline">Вернуть маршрут в работу</button></form>{% endif %}
+  </div>
+</div>
+{% endblock %}

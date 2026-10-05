@@ -1,0 +1,12 @@
+{# Карточка фрагмента: заголовок из словаря, цитата, связанные детали, причины подсветки. Уровня важности нет. #}
+<div class="acard{% if c.focus_index is not None %} focus{% endif %}{% if c.emergency %} emergency{% endif %}" id="seg-{{ c.anchor.id }}">
+  {% if pin_doc %}<form class="pin" method="post" action="{% url 'processing:pin' pin_doc %}">{% csrf_token %}
+    <input type="hidden" name="seq" value="{{ c.anchor.id }}"><input type="hidden" name="next" value="{{ request.get_full_path }}#seg-{{ c.anchor.id }}">
+    <button class="{% if c.pinned %}on{% endif %}" title="{% if c.pinned %}Открепить{% else %}Закрепить в фокусе этого протокола{% endif %}" aria-pressed="{% if c.pinned %}true{% else %}false{% endif %}">{% icon "pin" "sm" %}</button></form>{% endif %}
+  <div class="head"><span class="title">{{ c.title }}</span>
+    <span class="small muted">{% if c.from_conclusion %}из заключения{% else %}из описания{% endif %}{% if c.focus_reason %} · в фокусе: {{ c.focus_reason }}{% endif %}</span></div>
+  <div class="quote">«{{ c.anchor.text }}»{% if c.anchor.organ %} <span class="small muted">· {{ c.anchor.organ|lower }}</span>{% endif %}</div>
+  {% for d in c.details %}<div class="detail">«{{ d.text }}»{% if d.organ %} <span class="small muted">· {{ d.organ|lower }}</span>{% endif %}
+    {% if d.link_reason %}<span class="small muted">· {{ d.link_reason }}</span>{% endif %}</div>{% endfor %}
+  {% if c.highlights %}<div class="hls">{% for h in c.highlights %}<span class="hl {{ h.type|hl_class }}" title="{{ h.type|human:'highlight' }}">{{ h.text }}</span>{% endfor %}</div>{% endif %}
+</div>

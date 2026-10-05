@@ -1,0 +1,14 @@
+<div class="card" id="task-{{ t.pk }}" style="margin-bottom:12px">
+  <div class="row between">
+    <div class="row"><span class="avatar" style="{% if t.priority == 1 %}background:var(--red-soft);color:var(--red){% endif %}">{% if t.task_type == 'call_patient' or t.task_type == 'callback' %}{% icon "phone" "sm" %}{% else %}{% icon "tasks" "sm" %}{% endif %}</span>
+      <div><b>{{ t.task_type|human:"task_type" }}</b><div class="small muted">{{ name }}{% if t.due_at %} · {% if t.due_at < now %}<span style="color:var(--red)">просрочено с {{ t.due_at|date:"d.m H:i" }}</span>{% else %}до {{ t.due_at|date:"d.m H:i" }}{% endif %}{% endif %}</div></div></div>
+    <div class="tags">{% if t.priority == 1 %}<span class="tag red">Срочно</span>{% elif t.priority == 2 %}<span class="tag amber">Высокий приоритет</span>{% endif %}</div>
+  </div>
+  <p class="small mt-s mb-0">{{ t.title }}</p>
+  {% if t.script %}<details class="small mt-s"><summary>Скрипт звонка</summary><div class="note mt-s">{{ t.script|linebreaksbr }}</div></details>{% endif %}
+  <div class="row mt-s">
+    {% if t.task_type == 'review_recommendations' %}<a class="btn btn-sm btn-light" href="{% url 'coordinator:audits' %}?open=1">К обсуждению</a>{% elif t.route_id %}<a class="btn btn-sm btn-light" href="{% url 'coordinator:compare' t.route_id %}">Маршрут</a>{% endif %}
+    <form method="post" action="{% url 'coordinator:task_done' t.pk %}" class="row" style="flex:1">{% csrf_token %}<input type="hidden" name="next" value="{% url 'coordinator:tasks' %}">
+      <input name="resolution" placeholder="Чем закончилось: записан, не дозвонились…" style="flex:1;width:auto;min-width:200px"><button class="btn btn-sm btn-primary">Готово</button></form>
+  </div>
+</div>

@@ -1,0 +1,89 @@
+{% extends "workspace/base.html" %}
+{% block title %}Главная{% endblock %}
+{% block content %}
+{# Первый экран отвечает на три вопроса: что срочно, что сделать одним кликом, как идут дела. #}
+<section class="hero green">
+  <div class="eyebrow">{{ model_now|date:"j E, l" }}{% if clinic_title %} · {{ clinic_title }}{% endif %}</div>
+  <h1>{{ greeting }}! {% if attention %}Ждут разбора: {{ attention }} {{ attention|ru_plural:"протокол,протокола,протоколов" }}{% else %}Все протоколы разобраны{% endif %}</h1>
+  <p class="lead">
+    {% if counts.emergency %}<b>Экстренных: {{ counts.emergency }}</b> — начните с них. {% endif %}
+    {% if counts.unmatched %}Без пациента: {{ counts.unmatched }}. {% endif %}
+    {% if counts.needs_review %}Нужна проверка: {{ counts.needs_review }}. {% endif %}
+    {% if ws_counts.tasks %}Задач в работе: {{ ws_counts.tasks }}.{% endif %}
+    {% if not attention and not ws_counts.tasks %}Новые протоколы появятся здесь сразу после загрузки.{% endif %}
+  </p>
+  <div class="actions">
+    {% if counts.emergency %}<a class="btn" style="background:#fff;color:#b8261c" href="{% url 'coordinator:inbox' %}?category=emergency">{% icon "alert" %}Открыть экстренные</a>{% endif %}
+    <a class="btn" style="background:#fff;color:var(--brand-light-ink)" href="{% url 'coordinator:inbox' %}">{% icon "inbox" %}Разобрать входящие</a>
+    <a class="btn" style="background:rgba(255,255,255,.16);color:#fff" href="{% url 'processing:upload' %}">{% icon "upload" %}Загрузить протоколы</a>
+  </div>
+</section>
+
+<h2 class="mt">Быстрые действия</h2>
+<div class="quick">
+  <a href="{% url 'processing:upload' %}"><span class="circle">{% icon "upload" %}</span><span>Загрузить пачку<span class="sub">Файлы, папка или zip-архив</span></span></a>
+  <a href="{% url 'coordinator:unmatched' %}"><span class="circle">{% icon "user-question" %}</span><span>Найти пациента<span class="sub">Обезличенных: {{ counts.unmatched|default:0 }}</span></span></a>
+  <a href="{% url 'coordinator:tasks' %}"><span class="circle">{% icon "phone" %}</span><span>Позвонить пациентам<span class="sub">Задач: {{ ws_counts.tasks|default:0 }}</span></span></a>
+  <a href="{% url 'coordinator:clinics' %}"><span class="circle">{% icon "building" %}</span><span>Сравнить клиники<span class="sub">Запись за 72 часа, неявки</span></span></a>
+</div>
+
+<h2 class="mt">Протоколы по категориям</h2>
+<div class="grid grid-3">
+  {% for t in tiles %}
+  <a class="cat-tile {{ t.color }}" href="{% url 'coordinator:inbox' %}?category={{ t.code }}">
+    <div class="row between"><span class="t">{{ t.title }}</span>{% icon t.icon %}</div>
+    <div class="n">{{ t.count }}</div><div class="d">{{ t.hint }}</div>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="grid grid-2 mt">
+  <div class="card">
+    <div class="card-head"><h2>Сначала это</h2><a class="small" href="{% url 'coordinator:inbox' %}">Все входящие</a></div>
+    {% for r in recent %}
+      <a class="list-row" href="{% url 'coordinator:case' r.case.document_id %}" style="color:inherit;text-decoration:none">
+        <span class="circle {{ r.color }}">{% icon r.icon "sm" %}</span>
+        <span class="grow"><b>{{ r.case.study_type|default:r.case.filename|truncatechars:60 }}</b>
+          <span class="small muted" style="display:block">{{ r.patient }} · {{ r.clinic }} · {{ r.case.uploaded_at|ago }}</span>
+          <span class="tags mt-s">{% for t in r.reasons|slice:":3" %}<span class="tag {{ t.color }}">{{ t.title }}</span>{% endfor %}</span></span>
+        {% icon "chevron" "sm" %}
+      </a>
+    {% empty %}<div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Входящие разобраны</div><div>Новые протоколы появятся здесь</div></div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Задачи на сегодня</h2><a class="small" href="{% url 'coordinator:tasks' %}">Все задачи</a></div>
+    {% for t, name in tasks %}
+      <a class="list-row" href="{% url 'coordinator:tasks' %}#task-{{ t.pk }}" style="color:inherit;text-decoration:none">
+        <span class="circle {% if t.priority == 1 %}red{% endif %}">{% if t.task_type == 'call_patient' or t.task_type == 'callback' %}{% icon "phone" "sm" %}{% else %}{% icon "tasks" "sm" %}{% endif %}</span>
+        <span class="grow"><b>{{ t.task_type|human:"task_type" }}</b><span class="small muted" style="display:block">{{ name }}{% if t.due_at %} · {% if t.due_at < now %}<span style="color:var(--red)">просрочено с {{ t.due_at|date:"d.m H:i" }}</span>{% else %}до {{ t.due_at|date:"d.m H:i" }}{% endif %}{% endif %}</span></span>
+        {% if t.priority == 1 %}<span class="tag red">Срочно</span>{% endif %}
+      </a>
+    {% empty %}<div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Задач нет</div></div>{% endfor %}
+  </div>
+</div>
+
+<div class="grid grid-2 mt">
+  <div class="card">
+    <div class="card-head"><h2>Как идут дела</h2><a class="small" href="{% url 'coordinator:analytics' %}">Дашборд</a></div>
+    <div class="grid grid-2" style="gap:12px">
+      <div><div class="small muted">Записались за 72 часа</div><div class="kpi-tile" style="box-shadow:none;padding:0"><div class="value">{{ kpis.booked_72h_rate|default_if_none:"—" }}{% if kpis.booked_72h_rate is not None %}<small>%</small>{% endif %}</div></div>
+        <div class="meter"><i style="width:{{ kpis.booked_72h_rate|width:100 }}%"></i></div></div>
+      <div><div class="small muted">Получили уведомление</div><div class="kpi-tile" style="box-shadow:none;padding:0"><div class="value">{{ kpis.notified_rate|default_if_none:"—" }}{% if kpis.notified_rate is not None %}<small>%</small>{% endif %}</div></div>
+        <div class="meter"><i style="width:{{ kpis.notified_rate|width:100 }}%"></i></div></div>
+      <div><div class="small muted">Протоколов с находками</div><div class="kpi-tile" style="box-shadow:none;padding:0"><div class="value">{{ kpis.findings_rate|default_if_none:"—" }}{% if kpis.findings_rate is not None %}<small>%</small>{% endif %}</div></div></div>
+      <div><div class="small muted">Неявки</div><div class="kpi-tile" style="box-shadow:none;padding:0"><div class="value">{{ kpis.no_show_rate }}<small>%</small></div></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Последние загрузки</h2><a class="small" href="{% url 'processing:upload' %}">Загрузить ещё</a></div>
+    {% for b in batches %}
+      <a class="list-row" href="{% url 'coordinator:inbox' %}?batch={{ b.id }}&category=all" style="color:inherit;text-decoration:none">
+        <span class="circle">{% if b.source == 'zip' %}{% icon "archive" "sm" %}{% elif b.source == 'folder' or b.source == 'browser_folder' %}{% icon "folder" "sm" %}{% else %}{% icon "file" "sm" %}{% endif %}</span>
+        <span class="grow"><b>{{ b.source|human:"batch_source" }}: {{ b.accepted }} {{ b.accepted|ru_plural:"протокол,протокола,протоколов" }}</b>
+          <span class="small muted" style="display:block">{{ b.created_at|ago }}{% if b.duplicates %} · повторов {{ b.duplicates }}{% endif %}{% if b.rejected %} · не принято {{ b.rejected|length }}{% endif %}{% if b.processing %} · читается {{ b.processing }}{% endif %}</span></span>
+        {% icon "chevron" "sm" %}
+      </a>
+    {% empty %}<div class="empty"><div class="circle">{% icon "upload" "lg" %}</div><div class="t">Загрузок ещё не было</div><a class="btn btn-primary mt-s" href="{% url 'processing:upload' %}">Загрузить протоколы</a></div>{% endfor %}
+  </div>
+</div>
+{% endblock %}

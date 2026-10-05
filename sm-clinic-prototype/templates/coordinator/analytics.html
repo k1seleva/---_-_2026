@@ -1,0 +1,66 @@
+{% extends "workspace/base.html" %}
+{% block title %}Аналитика{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Аналитика</div><h1>Дашборд{% if clinic_title %}: {{ clinic_title }}{% endif %}</h1></div>
+  <span class="small muted">Клиника выбирается вверху страницы</span></div>
+{% include "coordinator/_analytics_tabs.html" %}
+{% if not kpis.protocols %}<div class="note blue" style="margin-bottom:16px">{% icon "chart" "sm" %} Данных пока нет. Показатели считаются только по загруженным протоколам и действиям пациентов, без примерных цифр. <a href="{% url 'processing:upload' %}">Загрузить протоколы</a></div>{% endif %}
+
+<div class="grid grid-4">
+  <div class="kpi-tile"><div class="label">{% icon "file" "sm" %}Протоколов</div><div class="value">{{ kpis.protocols }}</div><div class="foot">с находками {{ kpis.findings_rate|default_if_none:"—" }}{% if kpis.findings_rate is not None %}%{% endif %}</div></div>
+  <div class="kpi-tile"><div class="label">{% icon "route" "sm" %}Маршрутов по находкам</div><div class="value">{{ kpis.routes_total }}</div><div class="foot">в работе {{ kpis.open_routes }}</div></div>
+  <div class="kpi-tile"><div class="label">{% icon "bell" "sm" %}Получили уведомление</div><div class="value">{{ kpis.notified_rate|default_if_none:"—" }}{% if kpis.notified_rate is not None %}<small>%</small>{% endif %}</div><div class="meter"><i style="width:{{ kpis.notified_rate|width:100 }}%"></i></div></div>
+  <div class="kpi-tile"><div class="label">{% icon "calendar" "sm" %}Записались к врачу</div><div class="value">{{ kpis.booking_rate|default_if_none:"—" }}{% if kpis.booking_rate is not None %}<small>%</small>{% endif %}</div><div class="meter"><i style="width:{{ kpis.booking_rate|width:100 }}%"></i></div></div>
+  <div class="kpi-tile"><div class="label">{% icon "clock" "sm" %}Записались за 24 часа</div><div class="value">{{ kpis.booked_24h_rate|default_if_none:"—" }}{% if kpis.booked_24h_rate is not None %}<small>%</small>{% endif %}</div><div class="meter"><i style="width:{{ kpis.booked_24h_rate|width:100 }}%"></i></div><div class="foot">от всех маршрутов</div></div>
+  <div class="kpi-tile"><div class="label">{% icon "clock" "sm" %}Записались за 72 часа</div><div class="value">{{ kpis.booked_72h_rate|default_if_none:"—" }}{% if kpis.booked_72h_rate is not None %}<small>%</small>{% endif %}</div><div class="meter"><i style="width:{{ kpis.booked_72h_rate|width:100 }}%"></i></div><div class="foot">цель пилота — от 60%</div></div>
+  <div class="kpi-tile amber"><div class="label">{% icon "x" "sm" %}Неявки</div><div class="value">{{ kpis.no_show_rate }}<small>%</small></div><div class="meter amber"><i style="width:{{ kpis.no_show_rate|width:100 }}%"></i></div></div>
+  <div class="kpi-tile amber"><div class="label">{% icon "user" "sm" %}Не вовлечены</div><div class="value">{{ kpis.not_engaged_rate }}<small>%</small></div><div class="foot">с эскалацией {{ kpis.escalated_share }}%</div></div>
+</div>
+
+<div class="grid mt" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);align-items:start">
+  <div class="card">
+    <div class="card-head"><h2>Воронка: от находки до операции</h2><span class="small muted">клик по шагу — список пациентов</span></div>
+    {% for row in funnel %}
+    <div class="bar-row">
+      <a href="{% url 'coordinator:stage' row.code %}">{{ row.title }}</a>
+      <div class="bar-track"><div class="bar-fill{% if forloop.counter > 4 %} soft{% endif %}" style="width:{{ row.value|width:top }}%"></div></div>
+      <div class="v">{{ row.value }}{% if row.conversion is not None %} <small>{{ row.conversion }}%</small>{% endif %}</div>
+    </div>
+    {% endfor %}
+    <p class="small muted mt-s">Процент — переход с предыдущего шага.</p>
+  </div>
+  <div class="stack">
+    <div class="card">
+      <h2>Протоколы по категориям</h2>
+      {% with total=kpis.protocols %}{% for c in categories %}
+      <a class="bar-row" href="{% url 'coordinator:inbox' %}?category={{ c.code }}" style="grid-template-columns:150px 1fr 40px;color:inherit;text-decoration:none">
+        <span>{{ c.title }}</span><div class="bar-track" style="height:14px"><div class="bar-fill {{ c.color }}" style="width:{{ c.count|width:total }}%"></div></div><span class="v">{{ c.count }}</span></a>
+      {% endfor %}{% endwith %}
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Прогон протоколов</h2>{% if case_run %}<a class="small" href="{% url 'processing:quality_run' case_run.id %}">Подробно</a>{% endif %}</div>
+      {% if case_run %}
+      <p class="small muted">{{ case_run.title }}{% if case_run.when %} · {{ case_run.when }}{% endif %}</p>
+      <div class="grid grid-2" style="gap:10px">
+        <div><div class="small muted">Протоколов</div><div class="value-sm">{{ case_run.protocols }}</div></div>
+        <div><div class="small muted">Сработал маршрут</div><div class="value-sm">{{ case_run.trigger_rate }}%</div></div>
+        <div><div class="small muted">Любой триггер</div><div class="value-sm">{% if case_run.any_trigger_rate is not None %}{{ case_run.any_trigger_rate }}%{% else %}—{% endif %}</div></div>
+        <div><div class="small muted">Рекомендаций достаточно</div><div class="value-sm">{{ case_run.sufficient }}</div></div>
+      </div>
+      <p class="small muted mt-s">Цифры посчитаны по настоящим протоколам; в прототипе хранятся только счётчики, без текстов.</p>
+      {% else %}<p class="muted small">Прогона ещё не было. Загрузите до 100 протоколов в «Качество разбора».</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card mt">
+  <h2>Закономерности по триггерам</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Триггер</th><th class="num">Маршрутов</th><th style="width:22%">Записались</th><th class="num">За 72 часа</th><th class="num">Не вовлечены</th><th class="num">Врач не согласен</th></tr></thead>
+    {% for r in by_trigger %}<tr><td>{{ r.title|default:r.trigger_code|human:"trigger" }}</td><td class="num">{{ r.total }}</td>
+      <td><div class="row" style="gap:8px;flex-wrap:nowrap"><div class="meter" style="flex:1;margin:0"><i style="width:{{ r.booking_rate|width:100 }}%"></i></div><b>{{ r.booking_rate }}%</b></div></td>
+      <td class="num">{{ r.booked_72h_rate|default_if_none:"—" }}{% if r.booked_72h_rate is not None %}%{% endif %}</td><td class="num">{{ r.not_engaged }}</td>
+      <td class="num">{{ r.ai_disagreement_rate|default_if_none:"—" }}{% if r.ai_disagreement_rate is not None %}%{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="muted">Нет данных</td></tr>{% endfor %}</table></div>
+</div>
+{% endblock %}

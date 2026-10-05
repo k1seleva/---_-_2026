@@ -1,0 +1,72 @@
+{% extends "workspace/base.html" %}
+{% load static %}
+{% block title %}Входящие протоколы{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs">Маршруты и протоколы</div><h1>Входящие протоколы</h1></div>
+  <a class="btn btn-primary" href="{% url 'processing:upload' %}">{% icon "upload" %}Загрузить протоколы</a>
+</div>
+
+{% if batch %}
+<div class="card soft" style="margin-bottom:16px">
+  <div class="row between"><div><b>Загрузка {{ batch.created_at|date:"d.m.Y H:i" }}</b> · {{ batch.source|human:"batch_source" }}</div>
+    <a class="small" href="{% url 'coordinator:inbox' %}">Показать все протоколы</a></div>
+  <div class="row mt-s small">
+    <span class="tag green">Принято: {{ batch.accepted }}</span>
+    {% if batch.duplicates %}<span class="tag gray" title="Этот файл уже загружали — повторно не обрабатывается">Повторы: {{ batch.duplicates }}</span>{% endif %}
+    {% if batch.rejected %}<span class="tag amber">Не принято: {{ batch.rejected|length }}</span>{% endif %}
+  </div>
+  {% with p=batch.progress %}{% if p.total %}
+  <div class="batch-progress mt-s" id="batch-progress" data-url="{% url 'processing:batch_progress' batch.id %}" data-finished="{{ p.finished|yesno:'1,0' }}">
+    <div class="bp-bar" role="progressbar" aria-valuemin="0" aria-valuemax="{{ p.total }}" aria-valuenow="{{ p.done|add:p.failed }}">
+      <span class="bp-done" style="width:{% widthratio p.done p.total 100 %}%"></span><span class="bp-failed" style="width:{% widthratio p.failed p.total 100 %}%"></span>
+    </div>
+    <div class="row small mt-s bp-counts">
+      <span>Разобрано <b data-k="done">{{ p.done }}</b> из <b>{{ p.total }}</b></span>
+      <span class="tag blue" data-k="queued-tag"{% if not p.queued %} hidden{% endif %}>В очереди: <b data-k="queued">{{ p.queued }}</b></span>
+      <span class="tag amber" data-k="failed-tag"{% if not p.failed %} hidden{% endif %}>Ошибка разбора: <b data-k="failed">{{ p.failed }}</b></span>
+      <span class="tag violet" data-k="llm-tag"{% if not p.llm_errors %} hidden{% endif %} title="Разметка только словарём: модель не ответила вовремя">Без ответа ИИ: <b data-k="llm_errors">{{ p.llm_errors }}</b></span>
+      <span class="muted" data-k="avg">{% if p.avg_ms %}в среднем {% widthratio p.avg_ms 1000 1 %} с на протокол{% endif %}</span>
+      <span class="muted" data-k="eta"></span>
+    </div>
+    <div class="small mt-s muted" data-k="current">{% for c in p.current %}Сейчас: {{ c.filename }}{% endfor %}</div>
+    <div class="note warn small mt-s" data-k="paused"{% if not p.model_paused %} hidden{% endif %}>Модель не отвечает, очередь ждёт её и продолжит сама. <span data-k="reason">{{ p.model_reason|truncatechars:200 }}</span></div>
+    <div class="small mt-s muted" data-k="note"{% if p.finished %} hidden{% endif %}>Разбор идёт в фоне: страницу можно закрыть, протоколы появятся в списке по мере готовности.</div>
+    {% if p.finished and p.llm_errors or p.finished and p.failed %}<div class="row mt-s">
+      {% if p.llm_errors %}<form method="post" action="{% url 'processing:batch_retry' batch.id %}">{% csrf_token %}<input type="hidden" name="what" value="llm"><button class="btn btn-sm btn-light">Повторить с ИИ ({{ p.llm_errors }})</button></form>{% endif %}
+      {% if p.failed %}<form method="post" action="{% url 'processing:batch_retry' batch.id %}">{% csrf_token %}<input type="hidden" name="what" value="failed"><button class="btn btn-sm btn-light">Повторить неудавшиеся ({{ p.failed }})</button></form>{% endif %}
+    </div>{% endif %}
+  </div>
+  <script src="{% static 'js/batch_progress.js' %}" defer></script>
+  {% endif %}{% endwith %}
+  {% if batch.rejected %}<details class="small mt-s"><summary>Какие файлы не приняты и почему</summary><ul>{% for r in batch.rejected %}<li>{{ r.file }} — {{ r.error }}</li>{% endfor %}</ul></details>{% endif %}
+</div>
+{% endif %}
+
+<nav class="tabs" aria-label="Категории">
+  {% for t in tabs %}<a href="?category={{ t.code }}{% if request.GET.batch %}&batch={{ request.GET.batch }}{% endif %}{% if request.GET.tag %}&tag={{ request.GET.tag }}{% endif %}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}" class="{% if t.code == category %}active{% endif %}">{{ t.title }}<span class="count">{{ t.count }}</span></a>{% endfor %}
+</nav>
+
+<form class="filters" method="get">
+  <input type="hidden" name="category" value="{{ category }}">{% if request.GET.batch %}<input type="hidden" name="batch" value="{{ request.GET.batch }}">{% endif %}
+  <label class="sr-only" for="f-tag">Метка</label>
+  <select id="f-tag" name="tag" onchange="this.form.submit()"><option value="">Любая метка</option>
+    {% for t in tag_options %}<option value="{{ t.code }}" {% if request.GET.tag == t.code %}selected{% endif %}>{{ t.title }}</option>{% endfor %}</select>
+  <label class="sr-only" for="f-q">Поиск</label>
+  <input id="f-q" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Файл, номер карты, тип исследования">
+  <button class="btn btn-sm btn-light">Найти</button>
+  {% if request.GET.tag or request.GET.q %}<a class="small" href="?category={{ category }}">Сбросить</a>{% endif %}
+</form>
+
+<div class="card" style="padding:8px 12px">
+  <form id="bulk" method="post" action="{% url 'coordinator:inbox_bulk' %}" class="row" style="padding:6px 0">{% csrf_token %}
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <span class="small muted">С отмеченными:</span>
+    <button class="btn btn-sm btn-light" name="op" value="review" title="Только для категории «Нужна проверка»">{% icon "check" "sm" %}Снять с проверки</button>
+    <select name="tag" style="width:auto;padding:6px 10px"><option value="">Метка…</option>{% for t in custom_tags %}<option value="{{ t.code }}">{{ t.title }}</option>{% endfor %}</select>
+    <button class="btn btn-sm btn-outline" name="op" value="tag">Добавить метку</button>
+  </form>
+  {% include "coordinator/_case_table.html" with selectable=True %}
+</div>
+<p class="small muted mt">Категория у протокола одна и выбирается по первому подходящему правилу: экстренно, ошибка обработки, пациент не определён, нужна проверка, маршрут запущен, без находок. Метки рядом объясняют, почему протокол попал именно сюда. <a href="{% url 'coordinator:tags' %}">Все метки</a></p>
+{% endblock %}

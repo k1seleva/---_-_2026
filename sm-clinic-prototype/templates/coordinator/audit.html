@@ -1,0 +1,61 @@
+{% extends "workspace/base.html" %}
+{% block title %}Обсуждение рекомендаций{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><div class="crumbs"><a href="{% url 'coordinator:audits' %}">Обсуждения рекомендаций</a></div>
+    <h1>{{ patient.display_name }}</h1>
+    <div class="muted">{{ document.study_type }}{% if document.study_date %} от {{ document.study_date|isodate|date:"d.m.Y" }}{% endif %} · {{ a.source_display|lower }} · правила версии {{ a.rules_version }}</div></div>
+  <div class="tags"><span class="tag {% if a.verdict == 'insufficient' %}amber{% elif a.verdict == 'needs_review' %}blue{% else %}green{% endif %}">{{ a.verdict_display }}</span><span class="tag gray">{{ a.status_display }}</span>
+    {% if document.id %}<a class="btn btn-sm btn-light" href="{% url 'coordinator:case' document.id %}">Карта протокола</a>{% endif %}</div>
+</div>
+<div class="note">{{ a.summary }}</div>
+
+<div class="grid grid-2 mt" style="align-items:start">
+  <div class="stack">
+    <div class="card">
+      <h2>Замечания и решения</h2>
+      <form method="post">{% csrf_token %}
+      {% for i in a.issues %}
+        <div class="issue sev-{{ i.severity }}">
+          <div class="row between"><b>{{ i.type_display }}</b>
+            <span class="small muted">{{ i.severity|human:"issue_severity" }}{% if i.rule_code %} · {{ i.rule_code|human:"indication_rule" }}{% endif %}</span></div>
+          <div class="small">{{ i.message }}</div>
+          {% if i.evidence_quote %}<div class="quote-src">«{{ i.evidence_quote|truncatechars:200 }}»</div>{% endif %}
+          {% if i.proposed_operation %}<div class="small mt-s">Предложение: добавить этап «<b>{{ i.proposed_operation.title }}</b>», срок до {{ i.proposed_operation.window_days }} дн.</div>{% endif %}
+          {% if i.decision == 'pending' and review %}
+          <div class="decision small">
+            <label><input type="radio" name="decision_{{ i.id }}" value="accepted"> Принять{% if i.proposed_operation %} и скорректировать маршрут{% endif %}</label>
+            <label><input type="radio" name="decision_{{ i.id }}" value="rejected"> Отклонить, рекомендаций врача достаточно</label>
+            <input name="comment_{{ i.id }}" placeholder="Комментарий: основание решения" style="flex:1;min-width:200px">
+          </div>
+          {% elif i.decision != 'not_required' %}<div class="small"><i>{{ i.decision_display }}</i>{% if i.decision_comment %}: {{ i.decision_comment }}{% endif %}</div>{% endif %}
+        </div>
+      {% empty %}<p class="muted">Замечаний нет.</p>{% endfor %}
+      {% if review and a.status == 'open' %}
+        <textarea name="comment" rows="2" placeholder="Итоговый комментарий (попадёт в журнал маршрута)"></textarea>
+        <button class="btn btn-primary mt-s">Сохранить решение</button>
+      {% endif %}
+      </form>
+    </div>
+    <div class="card">
+      <h3>Что рекомендовал врач</h3>
+      <ul class="small">{% for it in a.items %}<li>{{ it.text }}{% if it.specialty_code %}: <b>{{ specialties|get_item:it.specialty_code|default:it.specialty_code }}</b>{% endif %}{% if it.interval_days %}, через {{ it.interval_days }} дн.{% endif %}{% if it.vague %} <span class="tag amber">без профиля</span>{% endif %}</li>
+        {% empty %}<li class="muted">Рекомендаций нет</li>{% endfor %}</ul>
+      <h3 class="mt">Показания по находкам</h3>
+      {% for ind in a.indications %}<div class="notice small"><b>{{ ind.title }}</b>{% if ind.max_days %} · не позже {{ ind.max_days }} дн.{% endif %}
+        {% for e in ind.evidence %}<div class="quote-src">«{{ e.quote|truncatechars:200 }}» · {% if e.source == 'conclusion' %}заключение{% else %}описание{% endif %}{% if e.uncertain %}, с сомнением{% endif %}</div>{% endfor %}
+        <div class="muted">{{ ind.rationale }}{% if ind.conditions != 'без условий' %} ({{ ind.conditions }}){% endif %}</div></div>
+      {% empty %}<p class="muted small">По матрице показаний нет.</p>{% endfor %}
+      <h3 class="mt">Маршрут по протоколу</h3>
+      {% for r in routes %}<div class="notice small"><b>{{ r.reason }}</b> · {{ r.status|human:"route_status" }}
+        <ol>{% for s in r.steps %}<li>{{ s.title }}: <i>{{ s.status|human:"step_status" }}</i> <span class="muted">({{ s.source|human:"step_source" }})</span></li>{% endfor %}</ol>
+        <a href="{% url 'coordinator:compare' r.id %}">Открыть маршрут</a></div>
+      {% empty %}<p class="muted small">Маршрута по протоколу нет: при принятии предложения он будет создан.</p>{% endfor %}
+    </div>
+  </div>
+  <div class="card">
+    <h2>Протокол глазами врача</h2>
+    {% include "processing/_annotation.html" with pin_doc=a.document_id %}
+  </div>
+</div>
+{% endblock %}

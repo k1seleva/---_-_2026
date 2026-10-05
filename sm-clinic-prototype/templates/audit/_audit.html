@@ -1,0 +1,11 @@
+{# Результат проверки рекомендаций: вердикт, показания с основаниями, замечания. #}
+<div class="notice">
+  <div class="row" style="justify-content:space-between"><span class="title">{{ a.source_display }}</span>
+    <span class="badge {% if a.verdict == 'insufficient' %}danger{% elif a.verdict == 'needs_review' %}warn{% else %}ok{% endif %}">{{ a.verdict_display }}</span></div>
+  <div class="small">{{ a.summary }}</div>
+  {% if a.items %}<div class="small muted" style="margin-top:4px">Что рекомендовал врач: {% for i in a.items %}{{ i.text }}{% if not forloop.last %}; {% endif %}{% endfor %}</div>{% endif %}
+  {% for i in a.issues %}{% if i.severity != 'info' or show_info %}
+  <div class="issue sev-{{ i.severity }} small"><b>{{ i.type_display }}</b>{% if i.decision != 'pending' and i.decision != 'not_required' %} · <i>{{ i.decision_display }}</i>{% endif %}<br>{{ i.message }}</div>
+  {% endif %}{% endfor %}
+  {% if a.status == 'open' %}<a class="small" href="{% url 'coordinator:audit' a.id %}">Открыть разбор у координатора →</a>{% endif %}
+</div>

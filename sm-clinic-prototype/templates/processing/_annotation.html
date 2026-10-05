@@ -1,0 +1,45 @@
+{% comment %}Разметка протокола для врача. ИИ и правила только подсвечивают и структурируют; что смотреть первым, решает врач.
+   Порядок — как в самом протоколе; «В фокусе» собирается из приоритетов врача, фильтров случая и закреплённых фрагментов.{% endcomment %}
+{% if annotation and annotation.view %}{% with v=annotation.view %}
+  {% if v.emergency %}<div class="emergency-banner" role="alert">{% icon "alert" %}<div><b>В протоколе экстренная находка.</b>
+    {% for e in v.emergency %}<a href="#seg-{{ e.id }}" style="color:inherit;text-decoration:underline">«{{ e.text|truncatechars:120 }}»</a>{% if not forloop.last %}; {% endif %}{% endfor %}
+    <div class="small">Это предупреждение безопасности: карточка остаётся на своём месте в протоколе.</div></div></div>{% endif %}
+
+  {% if not compact %}
+  <div class="focus-bar" aria-label="Что показать первым">
+    <span class="small muted">Показать первым:</span>
+    {% for o in v.options %}<a class="fchip{% if o.active %} on{% endif %}" href="?focus={{ v.focus.keys|focus_toggle:o.key|urlencode }}" aria-pressed="{% if o.active %}true{% else %}false{% endif %}">{{ o.title }} <span class="n">{{ o.count }}</span></a>{% endfor %}
+    {% if annotation.case_focus %}<a class="small" href="?">Вернуть мои приоритеты</a>{% endif %}
+    <a class="small" href="{% url 'coordinator:priorities' %}">Настроить приоритеты</a>
+  </div>
+  {% endif %}
+
+  {% if v.focus.cards %}<div class="ablock"><h3>{% icon "star" "sm" %}В фокусе <span class="small muted">{{ v.focus.cards|length }} · порядок задаёте вы</span></h3>
+    {% for c in v.focus.cards %}{% include "processing/_acard.html" %}{% endfor %}</div>{% endif %}
+
+  {% if v.conclusion %}<div class="ablock"><h3>Заключение <span class="small muted">{{ v.conclusion|length }} · в порядке протокола</span></h3>
+    {% for c in v.conclusion %}{% include "processing/_acard.html" %}{% endfor %}</div>{% endif %}
+
+  {% for g in v.description_groups %}<div class="ablock"><h3>Изменения в описании: {{ g.organ|lower }} <span class="small muted">{{ g.cards|length }}</span></h3>
+    {% for c in g.cards %}{% include "processing/_acard.html" %}{% endfor %}</div>{% endfor %}
+
+  {% if v.recommendations %}<div class="ablock"><h3>Рекомендации в протоколе</h3>
+    <ul class="seglist">{% for r in v.recommendations %}<li>{{ r.text }}</li>{% endfor %}</ul></div>{% endif %}
+
+  {% if v.unclassified %}<div class="ablock"><h3>Не классифицировано автоматически <span class="small muted">прочитайте</span></h3>
+    <ul class="seglist">{% for r in v.unclassified %}<li>{{ r.text }}{% if r.organ %} <span class="organ">· {{ r.organ|lower }}</span>{% endif %}</li>{% endfor %}</ul></div>{% endif %}
+
+  {% if v.norm %}<details class="ablock" {% if not compact %}open{% endif %}><summary><b>Норма и параметры</b> <span class="small muted">{{ v.norm|length }} · в исходном порядке</span></summary>
+    <ul class="seglist">{% for r in v.norm %}<li>{% if r.kind == 'measurement' %}<span class="hl">параметр</span> {% endif %}{{ r.text }}{% if r.organ %} <span class="organ">· {{ r.organ|lower }}</span>{% endif %}</li>{% endfor %}</ul></details>{% endif %}
+
+  {% if v.service %}<details class="ablock"><summary><b>Служебное</b> <span class="small muted">шапка, аппарат, дисклеймер · {{ v.service|length }}</span></summary>
+    <ul class="seglist small muted">{% for r in v.service %}<li>{{ r.text }}</li>{% endfor %}</ul></details>{% endif %}
+
+  <div class="integrity">Показано {{ v.shown }} из {{ v.total }} фрагментов протокола: текст сохранён полностью, ничего не скрыто.
+    {% with g=annotation.integrity %}{% if g.llm_used %}
+      ИИ-агент: отброшено как не подтверждённое текстом {{ g.rejected }}, попыток убрать подсветку со значимого фрагмента {{ g.hidden_ignored }}, без метки ИИ (модель не увидела изменений, остаётся разметка словаря) {{ g.missing_segments }}.
+    {% else %}Разметку сделали правила словаря (ИИ-агент не подключён).{% endif %}{% endwith %}
+  </div>
+{% endwith %}{% elif annotation.summary.error %}
+  <p class="small" style="color:var(--red)">{{ annotation.summary.error }}</p>
+{% else %}<p class="muted small">Разметки нет: протокол ещё читается или обработан до появления модуля.</p>{% endif %}

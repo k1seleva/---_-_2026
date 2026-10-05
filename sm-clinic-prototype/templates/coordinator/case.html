@@ -1,0 +1,97 @@
+{% extends "workspace/base.html" %}
+{% load static %}
+{% block title %}{{ doc.study_type|default:doc.filename }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <div class="crumbs"><a href="{% url 'coordinator:inbox' %}">Входящие</a> · {{ clinic|default:"клиника не указана" }}</div>
+    <h1>{{ doc.study_type|default:"Тип исследования не распознан" }}</h1>
+    <div class="muted">{% if patient %}{% if patient.is_anonymous %}<span class="tag violet">{{ patient.display_name }}</span>{% else %}{{ patient.display_name }} · карта {{ patient.external_mis_id }}{% endif %}{% endif %}
+      {% if doc.study_date %} · исследование от {{ doc.study_date|isodate|date:"d.m.Y" }}{% endif %} · загружен {{ case.uploaded_at|ago }} · {{ doc.filename }}{% if case.version > 1 %} · версия {{ case.version }}{% endif %}</div>
+    <div class="tags mt-s"><span class="tag {{ style.0 }}">{{ case.category|human:"case_category" }}</span>
+      {% for t in reasons %}<span class="tag {{ t.color }}" title="{{ t.description }}">{{ t.title }}</span>{% endfor %}
+      {% for t in case.tags.all %}<span class="tag custom {{ t.color }}">{{ t.title }}</span>{% endfor %}</div>
+  </div>
+  <div class="row">
+    {% if needs_review %}<form method="post" action="{% url 'coordinator:case_action' case.document_id %}">{% csrf_token %}<input type="hidden" name="op" value="review"><button class="btn btn-primary">{% icon "check" %}Проверено, снять с проверки</button></form>{% endif %}
+    {% if case.reviewed_at %}<span class="tag green">Проверено {{ case.reviewed_at|date:"d.m H:i" }}{% if case.reviewed_by %} · {{ case.reviewed_by }}{% endif %}</span>{% endif %}
+  </div>
+</div>
+
+<div class="note blue" style="margin-bottom:16px">{% icon "shield" "sm" %} Система подсвечивает фразы протокола и показывает, какое правило запустило маршрут. Она не ставит диагноз и не назначает лечение: решение принимает врач.</div>
+
+{% include "coordinator/_triggers.html" %}
+
+{% if case.is_placeholder %}
+<div class="card" style="border:2px solid var(--violet-soft);margin-bottom:16px">
+  <div class="card-head"><h2>{% icon "user-question" %} Чей это протокол?</h2><span class="small muted">Пока пациент не выбран, маршрут не строится и уведомления не отправляются</span></div>
+  <p class="small">В протоколе найдено: {% if case.card_number %}номер карты «<b>{{ case.card_number }}</b>» — в МИС такого нет{% else %}номер карты не найден{% endif %}.</p>
+  <div class="grid grid-2">
+    <form method="post" action="{% url 'coordinator:case_action' case.document_id %}">{% csrf_token %}<input type="hidden" name="op" value="assign">
+      <label for="assign-p">Пациент клиники</label>
+      <div class="field-row"><select id="assign-p" name="patient_id" required><option value="">Выберите пациента</option>{% for p in patients %}<option value="{{ p.id }}">{{ p.display_name }} · {{ p.external_mis_id }}</option>{% endfor %}</select>
+        <button class="btn btn-primary">Привязать</button></div></form>
+    <form method="post" action="{% url 'coordinator:case_action' case.document_id %}">{% csrf_token %}<input type="hidden" name="op" value="create">
+      <label for="new-mis">Новый пациент по номеру карты</label>
+      <div class="field-row"><input id="new-mis" name="new_mis_id" placeholder="Номер карты в МИС" required><input name="new_name" placeholder="ФИО (необязательно)"><button class="btn btn-light">Создать</button></div></form>
+  </div>
+  <form method="post" action="{% url 'coordinator:case_action' case.document_id %}" class="row mt-s">{% csrf_token %}<input type="hidden" name="op" value="reject">
+    <input name="reason" placeholder="Причина: чужой протокол, тестовый файл…" style="flex:1;width:auto"><button class="btn btn-danger btn-sm">Снять с разбора</button></form>
+</div>
+{% endif %}
+
+<div class="grid" style="grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);align-items:start">
+  <div class="card">
+    <div class="card-head"><h2>Протокол глазами врача</h2><span class="small muted">ИИ подсвечивает, порядок выбираете вы</span></div>
+    {% include "processing/_annotation.html" with pin_doc=case.document_id %}
+    <details class="ablock" id="evidence"{% if request.GET.tsort %} open{% endif %}><summary><b>Исходный текст с подсветкой доказательств</b></summary>
+      {% include "processing/_evidence.html" with ev=evidence %}</details>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-head"><h2>Почему так</h2><span class="small muted">фраза · правило · маршрут</span></div>
+      {% for w in why %}
+      <div class="why">
+        <b>{{ w.finding }}</b>
+        <div class="why-chain">
+          <div><span class="k">Фраза в протоколе</span>«{{ w.quote|default:"—"|truncatechars:160 }}»</div>
+          <div><span class="k">Правило</span>{% if w.rule %}{{ w.rule }}{% if w.version %} <span class="muted small">версия {{ w.version }}</span>{% endif %}{% else %}<span class="muted">Правило маршрута не сработало</span>{% endif %}</div>
+          <div><span class="k">Маршрут</span>{% if w.route %}<a href="{% url 'coordinator:compare' w.route.id %}">{{ w.route.status|human:"route_status" }}</a>{% if w.route.active_step %}<div class="small muted">сейчас: {{ w.route.active_step.title }}</div>{% endif %}{% else %}<span class="muted">не создан</span>{% endif %}</div>
+        </div>
+      </div>
+      {% empty %}<p class="muted">{% if case.category == 'failed' %}Файл не прочитан: {{ case.error|default:"ошибка обработки" }}{% else %}Находок, которые запускают маршрут, нет.{% endif %}</p>{% endfor %}
+      {% if not_triggered %}<details class="small mt-s"><summary>Почему другие правила не сработали</summary><ul>{% for r in not_triggered %}<li>{{ r }}</li>{% endfor %}</ul></details>{% endif %}
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Маршрут</h2>{% if routes %}<span class="small muted">правка вручную — в карточке маршрута</span>{% endif %}</div>
+      {% for r in routes %}
+        <div class="row between"><b>{{ r.reason }}</b><span class="tag {% if r.is_open %}blue{% elif r.status == 'completed' %}green{% else %}gray{% endif %}">{{ r.status|human:"route_status" }}</span></div>
+        <ul class="timeline mt-s">{% for s in r.steps %}
+          <li class="{% if s.status == 'done' %}done{% elif s.status == 'awaiting_booking' or s.status == 'booked' %}active{% elif s.status == 'skipped' or s.status == 'cancelled' %}skipped{% endif %}"><span class="dot"></span>
+            <b>{{ s.title }}</b>{% if s.specialty_title %} <span class="small muted">· {{ s.specialty_title }}</span>{% endif %}
+            <div class="small muted">{{ s.status|human:"step_status" }}{% if s.due_date and s.status != 'done' %} · срок до {{ s.due_date|date:"d.m.Y" }}{% endif %}</div></li>{% endfor %}</ul>
+        <a class="btn btn-light btn-sm" href="{% url 'coordinator:compare' r.id %}">{% icon "sliders" "sm" %}Открыть и скорректировать</a>
+        {% if not forloop.last %}<hr style="border:0;border-top:1px solid var(--line);margin:16px 0">{% endif %}
+      {% empty %}<p class="muted">{% if case.is_placeholder %}Маршрут появится после привязки к пациенту.{% else %}Маршрут не создан.{% endif %}</p>{% endfor %}
+    </div>
+
+    <div class="card">
+      <h2>Проверка рекомендаций</h2>
+      {% for a in audits %}{% include "audit/_audit.html" with show_info=True %}{% empty %}<p class="muted small">Проверка не выполнялась.</p>{% endfor %}
+    </div>
+
+    <div class="card">
+      <h2>Мои метки</h2>
+      <form method="post" action="{% url 'coordinator:case_action' case.document_id %}">{% csrf_token %}<input type="hidden" name="op" value="tags">
+        <div class="tags">{% for t in custom_tags %}<label class="fchip{% if t.code in case_tags %} on{% endif %}" style="margin:0"><input type="checkbox" name="tags" value="{{ t.code }}" {% if t.code in case_tags %}checked{% endif %}> {{ t.title }}</label>{% empty %}<span class="muted small">Своих меток нет.</span>{% endfor %}</div>
+        <div class="row mt-s"><button class="btn btn-sm btn-light">Сохранить метки</button><a class="small" href="{% url 'coordinator:tags' %}">Создать метку</a></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% include "coordinator/_advice.html" %}
+{% endblock %}
+{% block page_scripts %}<script src="{% static 'js/evidence.js' %}"></script>{% endblock %}

@@ -1,0 +1,21 @@
+{# Исходный текст протокола с многослойной подсветкой. Ожидает ev = ProcessingFacade.evidence_view(...) #}
+<div class="ev-wrap" data-mode="all" data-type="{{ ev.legend.0.key|default:'' }}">
+  <div class="ev-tools">
+    <div class="ev-modes" role="radiogroup" aria-label="Что подсвечивать">
+      <label><input type="radio" name="ev-mode" value="all" checked> Все маркеры</label>
+      <label><input type="radio" name="ev-mode" value="triggers"> Только триггеры</label>
+      <label><input type="radio" name="ev-mode" value="type"> Только выбранный тип</label>
+      <label{% if not ev.ai_count %} class="muted" title="ИИ-агент не нашёл ничего сверх словаря"{% endif %}><input type="radio" name="ev-mode" value="ai"{% if not ev.ai_count %} disabled{% endif %}> Только найденное ИИ · {{ ev.ai_count|default:0 }}</label>
+      <select id="ev-type" aria-label="Тип маркера">{% for t in ev.legend %}<option value="{{ t.key }}">{{ t.title }} · {{ t.count }}</option>{% endfor %}</select>
+    </div>
+    <div class="ev-legend" aria-label="Легенда цветов">
+      {% for t in ev.legend %}<span><i class="lg lg-{{ t.key }}"></i>{{ t.title }}</span>{% endfor %}
+      <span><i class="lg lg-trigger"></i>Триггер: жирный текст, линия под строкой и номер</span>
+      <span><i class="lg lg-ai"></i>Найдено только ИИ: пунктирная рамка и метка «ИИ»</span>
+    </div>
+  </div>
+  <pre class="protocol ev-text mt-s" id="ev-text">{{ ev.html }}</pre>
+  <p class="small muted mt-s">Наведите на подсветку, чтобы увидеть тип, уверенность и правило. Нажмите на триггер, чтобы перейти к нему в таблице «Выявленные триггеры».</p>
+  {{ ev.data|json_script:"ev-data" }}
+  <style>{{ ev.css }}</style>
+</div>

@@ -1,0 +1,218 @@
+{% extends "workspace/base.html" %}{% load static %}
+{% block title %}Загрузка протоколов{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Маршруты и протоколы</div><h1>Загрузка протоколов</h1></div>
+  <a class="btn btn-light" href="{% url 'coordinator:inbox' %}">{% icon "inbox" %}Входящие</a></div>
+
+<div class="grid" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);align-items:start">
+  <div class="stack">
+    {# Обычная форма работает и без JavaScript; скрипт добавляет перетаскивание, папки, проверку и прогресс. #}
+    <form class="card" id="upload-form" method="post" enctype="multipart/form-data">{% csrf_token %}
+      <div class="row between" style="margin-bottom:12px">
+        <div class="field-row" style="flex:1;min-width:240px"><label for="loc" style="margin:0;white-space:nowrap">Клиника</label>
+          <select id="loc" name="location_code" style="min-width:230px"><option value="">Определить по протоколу</option>{% for code, title in clinics.items %}<option value="{{ code }}" {% if code == clinic %}selected{% endif %}>{{ title }}</option>{% endfor %}</select></div>
+        <span class="small muted">Пациент определяется по номеру карты в протоколе</span>
+      </div>
+      <div class="dropzone" id="dropzone">
+        <div class="circle">{% icon "upload" "lg" %}</div>
+        <div class="t">Перетащите сюда файлы, папку или zip-архив</div>
+        <div class="muted small">{{ extensions|join:", " }} · до {{ max_mb }} МБ на файл · до 500 файлов за раз</div>
+        <div class="acts">
+          <label class="btn btn-primary" style="margin:0">{% icon "file" "sm" %}Выбрать файлы<input type="file" name="files" id="pick-files" multiple accept=".doc,.docx,.json,.zip" class="sr-only"></label>
+          <label class="btn btn-light" style="margin:0">{% icon "folder" "sm" %}Выбрать папку<input type="file" id="pick-folder" webkitdirectory multiple class="sr-only"></label>
+        </div>
+      </div>
+      <div id="queue" hidden>
+        <div class="row between mt"><b id="queue-title">Файлы к загрузке</b><button type="button" class="btn btn-sm btn-ghost" id="clear">Очистить</button></div>
+        <ul class="filelist" id="filelist"></ul>
+        <div class="progress mt" id="progress" hidden><i></i></div>
+        <div class="row mt"><button class="btn btn-primary" id="send">{% icon "upload" "sm" %}<span>Загрузить</span></button><span class="small muted" id="send-note"></span></div>
+        <p class="small muted mt-s">Файлы только сохраняются, разбор идёт в фоне по одному протоколу. Во «Входящих» видно, сколько готово и сколько осталось; страницу можно закрыть.</p>
+      </div>
+      <noscript><p class="mt"><button class="btn btn-primary">Загрузить</button></p></noscript>
+    </form>
+
+    <div class="card" id="watch-card">
+      <div class="card-head"><h2>{% icon "refresh" %} Следить за папкой</h2><span class="watch" id="watch-state"><span class="dotlive"></span><span class="small muted">выключено</span></span></div>
+      <p class="small">Выберите папку, куда аппарат УЗИ или МИС сохраняет протоколы. Пока страница открыта, новые файлы из неё загружаются сами раз в 10 секунд, повторно ничего не отправляется.</p>
+      <div class="row"><button type="button" class="btn btn-light" id="watch-btn">{% icon "folder" "sm" %}Выбрать папку для слежения</button>
+        <span class="small muted" id="watch-note"></span></div>
+      <p class="small muted mt-s">Без открытой страницы работает серверная папка: файлы из <code>{{ inbox_dir.name }}/&lt;код клиники&gt;/</code> забираются каждую минуту, обработанные переносятся в processed, ошибки — в failed.</p>
+    </div>
+  </div>
+
+  <div class="stack">
+    <div class="card">
+      <h2>Куда попадут протоколы</h2>
+      <p class="small muted">После загрузки откроются входящие этой пачки. У каждого протокола одна категория:</p>
+      <div class="list-row"><span class="tag red">Экстренно</span><span class="small grow">экстренная находка, задача создаётся сразу</span></div>
+      <div class="list-row"><span class="tag violet">Пациент не определён</span><span class="small grow">номер карты не найден, ждёт привязки</span></div>
+      <div class="list-row"><span class="tag amber">Нужна проверка</span><span class="small grow">нет заключения, рекомендаций или даты</span></div>
+      <div class="list-row"><span class="tag green">Маршрут запущен</span><span class="small grow">всё найдено, пациент ведётся</span></div>
+      <div class="list-row"><span class="tag gray">Без находок</span><span class="small grow">маршрут не нужен</span></div>
+      <div class="list-row"><span class="tag amber">Ошибка обработки</span><span class="small grow">файл не прочитан</span></div>
+    </div>
+    <div class="card">
+      <h2>Последние загрузки</h2>
+      {% for b in batches %}
+      <a class="list-row" href="{% url 'coordinator:inbox' %}?batch={{ b.id }}&category=all" style="color:inherit;text-decoration:none">
+        <span class="circle">{% if b.source == 'zip' %}{% icon "archive" "sm" %}{% elif b.source == 'folder' or b.source == 'browser_folder' %}{% icon "folder" "sm" %}{% else %}{% icon "file" "sm" %}{% endif %}</span>
+        <span class="grow"><b>{{ b.accepted }} {{ b.accepted|ru_plural:"протокол,протокола,протоколов" }}</b> <span class="small muted">· {{ b.source|human:"batch_source" }}</span>
+          <span class="small muted" style="display:block">{{ b.created_at|ago }}{% if b.duplicates %} · повторов {{ b.duplicates }}{% endif %}{% if b.rejected %} · не принято {{ b.rejected|length }}{% endif %}{% if b.processing %} · <b style="color:var(--green)">разбирается {{ b.processing }}</b>{% endif %}</span></span>
+      </a>
+      {% empty %}<p class="muted small">Загрузок ещё не было.</p>{% endfor %}
+    </div>
+    <div class="card soft small">
+      <b>Для МИС и скриптов</b>: <code>POST /api/v1/processing/batches/</code> с полями <code>files</code> (можно zip) и <code>location_code</code>.
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script>
+/* Загрузка пачкой: перетаскивание файлов и папок, выбор папки, zip, проверка до отправки, прогресс, слежение за папкой. */
+(function () {
+  var ALLOWED = ['.doc', '.docx', '.json', '.zip'];
+  var MAX = {{ max_mb }} * 1024 * 1024;
+  var form = document.getElementById('upload-form');
+  var drop = document.getElementById('dropzone');
+  var list = document.getElementById('filelist');
+  var queueBox = document.getElementById('queue');
+  var sendBtn = document.getElementById('send');
+  var note = document.getElementById('send-note');
+  var progress = document.getElementById('progress');
+  var queue = [];
+
+  function ext(name) { var i = name.lastIndexOf('.'); return i < 0 ? '' : name.slice(i).toLowerCase(); }
+  function check(file) {
+    if (file.name.charAt(0) === '.' || file.name.indexOf('~$') === 0) return 'служебный файл, пропущен';
+    if (ALLOWED.indexOf(ext(file.name)) < 0) return 'формат не поддерживается';
+    if (file.size === 0) return 'пустой файл';
+    if (ext(file.name) !== '.zip' && file.size > MAX) return 'больше {{ max_mb }} МБ';
+    return '';
+  }
+  function size(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.max(1, Math.round(n / 1024)) + ' КБ'; }
+  function render() {
+    list.innerHTML = '';
+    var ok = 0;
+    queue.forEach(function (item) {
+      var li = document.createElement('li');
+      var problem = check(item.file);
+      if (!problem) ok++;
+      li.innerHTML = '<span class="tag ' + (problem ? 'amber' : (ext(item.file.name) === '.zip' ? 'blue' : 'green')) + '">' +
+        (problem ? 'не будет загружен' : (ext(item.file.name) === '.zip' ? 'архив' : 'готов')) + '</span>' +
+        '<span class="name"></span><span class="small muted"></span>';
+      li.querySelector('.name').textContent = item.path || item.file.name;
+      li.querySelector('.muted').textContent = problem || size(item.file.size);
+      list.appendChild(li);
+    });
+    queueBox.hidden = queue.length === 0;
+    document.getElementById('queue-title').textContent = 'Выбрано: ' + queue.length + ', к загрузке: ' + ok;
+    sendBtn.disabled = ok === 0;
+    sendBtn.querySelector('span').textContent = ok ? 'Загрузить ' + ok : 'Нечего загружать';
+  }
+  function add(files, withPath) {
+    Array.prototype.forEach.call(files, function (f) {
+      queue.push({file: f, path: withPath ? (f.webkitRelativePath || f.name) : f.name});
+    });
+    render();
+  }
+  function readEntry(entry, out) {
+    return new Promise(function (resolve) {
+      if (entry.isFile) { entry.file(function (f) { out.push({file: f, path: entry.fullPath.replace(/^\//, '')}); resolve(); }, resolve); return; }
+      if (!entry.isDirectory) { resolve(); return; }
+      var reader = entry.createReader(), all = [];
+      (function next() {
+        reader.readEntries(function (batch) {
+          if (!batch.length) { Promise.all(all.map(function (e) { return readEntry(e, out); })).then(resolve); return; }
+          all = all.concat(Array.prototype.slice.call(batch)); next();
+        }, resolve);
+      })();
+    });
+  }
+
+  ['dragenter', 'dragover'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { drop.addEventListener(t, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) {
+    var items = e.dataTransfer.items;
+    if (items && items.length && items[0].webkitGetAsEntry) {
+      var out = [];
+      Promise.all(Array.prototype.map.call(items, function (it) { var en = it.webkitGetAsEntry(); return en ? readEntry(en, out) : null; }))
+        .then(function () { out.forEach(function (x) { queue.push(x); }); render(); });
+    } else { add(e.dataTransfer.files, false); }
+  });
+  document.getElementById('pick-files').addEventListener('change', function (e) { add(e.target.files, false); });
+  document.getElementById('pick-folder').addEventListener('change', function (e) { add(e.target.files, true); });
+  document.getElementById('clear').addEventListener('click', function () { queue = []; render(); });
+
+  function send(items, source, onDone) {
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', form.querySelector('[name=csrfmiddlewaretoken]').value);
+    data.append('location_code', form.querySelector('[name=location_code]').value);
+    data.append('source', source);
+    items.forEach(function (x) { data.append('files', x.file, x.file.name); });
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', form.action || window.location.pathname);
+    xhr.setRequestHeader('X-Requested-With', 'fetch');
+    xhr.upload.onprogress = function (e) { if (e.lengthComputable && source === 'manual') progress.firstElementChild.style.width = Math.round(100 * e.loaded / e.total) + '%'; };
+    xhr.onload = function () {
+      try { onDone(xhr.status < 300 ? JSON.parse(xhr.responseText) : null); } catch (err) { onDone(null); }
+    };
+    xhr.onerror = function () { onDone(null); };
+    xhr.send(data);
+  }
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var ready = queue.filter(function (x) { return !check(x.file); });
+    if (!ready.length) return;
+    sendBtn.disabled = true; progress.hidden = false; note.textContent = 'Отправляем ' + ready.length + '…';
+    send(ready, 'manual', function (res) {
+      if (!res) { note.textContent = 'Не удалось отправить. Проверьте соединение и попробуйте ещё раз.'; sendBtn.disabled = false; return; }
+      /* Сразу во «Входящие»: там ход разбора этой пачки (файлы уже сохранены, разбор идёт в фоне). */
+      note.textContent = 'Принято ' + res.accepted + (res.duplicates ? ', повторов ' + res.duplicates : '') + '. Открываем входящие…';
+      window.location.assign(res.url);
+    });
+  });
+
+  /* Слежение за папкой на компьютере координатора (File System Access API: Chrome, Edge, Яндекс Браузер). */
+  var watchBtn = document.getElementById('watch-btn'), watchNote = document.getElementById('watch-note');
+  var state = document.getElementById('watch-state');
+  if (!window.showDirectoryPicker) {
+    watchBtn.disabled = true;
+    watchNote.textContent = 'Этот браузер не умеет следить за папкой. Используйте серверную папку или Chrome, Edge, Яндекс Браузер.';
+    return;
+  }
+  var seen = {}, dirHandle = null, sent = 0, busy = false;
+  try { seen = JSON.parse(localStorage.getItem('sm-watch-seen') || '{}'); } catch (err) { seen = {}; }
+  function remember() { try { localStorage.setItem('sm-watch-seen', JSON.stringify(seen)); } catch (err) { /* без памяти — не страшно, сервер отсеет повторы */ } }
+  async function scan() {
+    if (!dirHandle || busy) return;
+    busy = true;
+    var fresh = [];
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind !== 'file') continue;
+      var file = await entry.getFile();
+      var key = dirHandle.name + '/' + file.name + ':' + file.lastModified + ':' + file.size;
+      if (seen[key] || check(file)) continue;
+      if (Date.now() - file.lastModified < 5000) continue; /* файл ещё дописывается */
+      fresh.push({file: file, path: file.name, key: key});
+    }
+    if (!fresh.length) { busy = false; return; }
+    send(fresh, 'browser_folder', function (res) {
+      busy = false;
+      if (!res) { watchNote.textContent = 'Не удалось отправить, повторим через 10 секунд'; return; }
+      fresh.forEach(function (x) { seen[x.key] = 1; }); remember();
+      sent += res.accepted;
+      watchNote.innerHTML = 'Отправлено: ' + sent + '. <a href="' + res.url + '">Открыть ход разбора</a>';
+    });
+  }
+  watchBtn.addEventListener('click', async function () {
+    try { dirHandle = await window.showDirectoryPicker({mode: 'read'}); } catch (err) { return; }
+    state.classList.add('on'); state.querySelector('.muted').textContent = 'слежу за «' + dirHandle.name + '»';
+    watchNote.textContent = 'Проверяю каждые 10 секунд';
+    scan(); setInterval(scan, 10000);
+  });
+})();
+</script>
+{% endblock %}

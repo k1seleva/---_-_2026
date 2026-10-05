@@ -1,0 +1,292 @@
+{
+ "title": "Протоколы кейса СМ-Клиники: 89 обезличенных, только счётчики",
+ "date": "2026-10-04",
+ "summary": {
+  "protocols": 89,
+  "read_ok": 89,
+  "read_errors": 0,
+  "markup_errors": 0,
+  "markup_ok": 89,
+  "with_trigger": 53,
+  "trigger_rate": 59.6,
+  "no_conclusion": 1,
+  "not_in_conclusion": 7,
+  "emergency": 0,
+  "uncertain": 8,
+  "avg_ms": 130,
+  "rules": [
+   [
+    "bph",
+    9
+   ],
+   [
+    "uterine_myoma",
+    8
+   ],
+   [
+    "thyroid_nodule",
+    7
+   ],
+   [
+    "gallbladder_polyp",
+    6
+   ],
+   [
+    "ovarian_mass",
+    4
+   ],
+   [
+    "gallstones",
+    4
+   ],
+   [
+    "endometrial_polyp",
+    3
+   ],
+   [
+    "stenotic_atherosclerosis",
+    3
+   ],
+   [
+    "varicose_veins",
+    3
+   ],
+   [
+    "birads_3_5",
+    2
+   ],
+   [
+    "submucous_myoma",
+    1
+   ],
+   [
+    "endometrial_hyperplasia",
+    1
+   ],
+   [
+    "arterial_stenosis_50",
+    1
+   ],
+   [
+    "breast_mass",
+    1
+   ]
+  ],
+  "findings": [
+   [
+    "uterine_myoma",
+    11
+   ],
+   [
+    "bph",
+    9
+   ],
+   [
+    "birads_category",
+    8
+   ],
+   [
+    "ovarian_mass",
+    7
+   ],
+   [
+    "thyroid_nodule",
+    7
+   ],
+   [
+    "orads_category",
+    6
+   ],
+   [
+    "gallbladder_polyp",
+    6
+   ],
+   [
+    "arterial_stenosis",
+    6
+   ],
+   [
+    "tirads_category",
+    6
+   ],
+   [
+    "endometrial_polyp",
+    4
+   ],
+   [
+    "gallstones",
+    4
+   ],
+   [
+    "stenotic_atherosclerosis",
+    3
+   ],
+   [
+    "varicose_veins",
+    3
+   ],
+   [
+    "breast_mass",
+    2
+   ],
+   [
+    "submucous_myoma",
+    1
+   ],
+   [
+    "endometrial_hyperplasia",
+    1
+   ]
+  ],
+  "highlights": [
+   [
+    "change",
+    249
+   ],
+   [
+    "unclassified",
+    245
+   ],
+   [
+    "finding",
+    88
+   ],
+   [
+    "side",
+    87
+   ],
+   [
+    "size",
+    65
+   ],
+   [
+    "uncertain",
+    27
+   ],
+   [
+    "scale",
+    26
+   ],
+   [
+    "percent",
+    26
+   ],
+   [
+    "conclusion_item",
+    22
+   ],
+   [
+    "count",
+    20
+   ],
+   [
+    "rule",
+    13
+   ],
+   [
+    "not_in_conclusion",
+    8
+   ],
+   [
+    "negation_nearby",
+    3
+   ]
+  ],
+  "verdicts": [
+   [
+    "sufficient",
+    55
+   ],
+   [
+    "needs_review",
+    33
+   ],
+   [
+    "insufficient",
+    1
+   ]
+  ],
+  "issues": [
+   [
+    "missing_consultation",
+    27
+   ],
+   [
+    "unsupported",
+    22
+   ],
+   [
+    "no_recommendations",
+    17
+   ],
+   [
+    "not_in_conclusion",
+    8
+   ],
+   [
+    "missing_diagnostics",
+    1
+   ]
+  ],
+  "triggers_total": 60,
+  "triggers_by_type": [
+   [
+    "route",
+    53
+   ],
+   [
+    "review",
+    7
+   ]
+  ],
+  "with_any_trigger": 54,
+  "any_trigger_rate": 60.7,
+  "markers_total": 1328,
+  "markers_by_type": [
+   [
+    "sign",
+    466
+   ],
+   [
+    "negation",
+    419
+   ],
+   [
+    "side",
+    107
+   ],
+   [
+    "finding",
+    103
+   ],
+   [
+    "size",
+    100
+   ],
+   [
+    "percent",
+    34
+   ],
+   [
+    "uncertain",
+    33
+   ],
+   [
+    "scale",
+    31
+   ],
+   [
+    "count",
+    22
+   ],
+   [
+    "rule",
+    13
+   ]
+  ],
+  "overlaps_total": 171,
+  "corrected_total": 5,
+  "trigger_confidence_avg": 0.89
+ },
+ "note": "Локальный прогон обезличенных протоколов кейса. Только счётчики и коды: без текстов, цитат и имён файлов."
+}

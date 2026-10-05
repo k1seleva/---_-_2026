@@ -1,0 +1,9 @@
+{% extends "workspace/base.html" %}
+{% block title %}Врач{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Маршруты и протоколы</div><h1>Приём врача</h1></div></div>
+<p class="muted">Экран приёма показан так, как он встроится в МИС 1С: баннер маршрута, незавершённые маршруты и обязательный выбор тактики. Выберите врача.</p><div>
+<div class="grid grid-3">{% for d in doctors %}<a class="card" href="{% url 'doctors:schedule' d.pk %}"><div class="row"><span class="avatar">{{ d.full_name|initials }}</span><h3 style="margin:0">{{ d.full_name }}</h3></div>
+  <div class="small muted">{% for s in d.specialties.all %}{{ s.title }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+  <div class="small muted">{% for l in d.locations.all %}{{ l.title }}{% if not forloop.last %} · {% endif %}{% endfor %}</div></a>{% endfor %}</div></div>
+{% endblock %}

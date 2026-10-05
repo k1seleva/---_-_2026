@@ -1,0 +1,43 @@
+{% extends "base.html" %}{% load static %}
+{% block body_class %}{% if patient.large_text %}large-text{% endif %}{% endblock %}
+{% block body %}
+{# Шапка как в личном кабинете СМ-Клиники: зелёная полоса, логотип, поиск, колокольчик, имя. #}
+<header class="p-header"><div class="wrap">
+  <a class="p-logo" href="{% url 'patients:cabinet' patient.pk %}"><span class="mark">СМ</span><span>СМ-Клиника</span></a>
+  <form class="p-search" role="search" onsubmit="return false"><label class="sr-only" for="p-q">Поиск</label>{% icon "search" %}<input id="p-q" placeholder="Врач, услуга или клиника"></form>
+  <div class="right row" style="gap:14px">
+    <div class="bell">
+      <button class="bell-btn" type="button" data-popover-toggle aria-controls="p-bell" aria-expanded="false" aria-label="Уведомления{% if unread %}: новых {{ unread }}{% endif %}">
+        {% icon "bell" %}{% if unread %}<span class="pill red" data-bell-count>{{ unread }}</span>{% endif %}
+      </button>
+      <div class="popover" id="p-bell" hidden role="dialog" aria-label="Уведомления">
+        <div class="pop-head"><h3>Уведомления</h3>{% if unread %}<span class="pill green" data-unread-count>{{ unread }}</span>
+          <form method="post" action="{% url 'patients:notifications_read' patient.pk %}" data-ajax="p-bell" class="right">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn-ghost btn">Прочитать все</button></form>{% endif %}</div>
+        <div class="pop-list">
+          {% for n in bell %}
+          <div class="pop-item{% if not n.read_at %} unread{% endif %}">
+            <span class="ico">{% icon n.icon "sm" %}</span>
+            <div>
+              <a class="t" href="{% url 'patients:notification_open' patient.pk n.pk %}" style="color:inherit;display:block">{{ n.title }}</a>
+              <div class="b">{{ n.body|truncatechars:110 }}</div>
+              <div class="when">{{ n.created_at|ago }}{% if not n.read_at %} · новое{% endif %}</div>
+              {% if n.actions %}<div class="acts">
+                {% for b in n.actions|slice:":2" %}<form method="post" action="{% url 'patients:action' patient.pk %}">{% csrf_token %}<input type="hidden" name="route_id" value="{{ n.route_id }}"><input type="hidden" name="action" value="{{ b.action }}"><button class="btn btn-sm {% if forloop.first %}btn-primary{% else %}btn-light{% endif %}">{{ b.label }}</button></form>{% endfor %}
+              </div>{% endif %}
+            </div>
+          </div>
+          {% empty %}<div class="pop-empty">{% icon "bell" "lg" %}<div><b>Новых уведомлений нет</b></div><div class="small">Здесь появятся результаты и напоминания о записи</div></div>{% endfor %}
+        </div>
+        <div class="pop-foot"><a href="{% url 'patients:cabinet' patient.pk %}?tab=notifications">Все уведомления</a><a href="{% url 'patients:settings' patient.pk %}">Настроить каналы</a></div>
+      </div>
+    </div>
+    <span class="p-user"><span class="avatar">{{ patient.display_name|initials }}</span><span>{{ patient.display_name }}</span></span>
+    <form method="post" action="{% url 'patients:logout' %}">{% csrf_token %}<button class="p-logout" title="Выйти из личного кабинета">Выйти</button></form>
+  </div>
+</div></header>
+<main class="wrap p-main">
+  {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/ui.js' %}"></script>{% endblock %}

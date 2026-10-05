@@ -1,0 +1,70 @@
+{# Блок «Выявленные триггеры»: сводка и таблица. Сортировка — только способ просмотра, не ранжирование. #}
+<div class="card trig-card" id="triggers">
+  <div class="card-head"><h2>{% icon "route" %} Выявленные триггеры</h2>
+    <span class="small muted">Сортировка:
+      {% for key, title in triggers.sorts.items %}{% if key == triggers.sort %}<b>{{ title }}</b>{% else %}<a href="?tsort={{ key }}#triggers">{{ title }}</a>{% endif %}{% if not forloop.last %} · {% endif %}{% endfor %}</span></div>
+  {% with e=triggers.engines %}<p class="small engines-line">Разметку выполнили: <span class="tag gray">словарь</span>
+    {% if e.llm == "ok" %}<span class="tag violet">{{ triggers.ai_name }} · {{ e.model }}</span>
+      <span class="muted">находки заключения{% if e.extraction.ms %} {{ e.extraction.ms|floatformat:"0" }} мс{% endif %}, разметка фрагментов{% if e.markup.ms %} {{ e.markup.ms|floatformat:"0" }} мс{% endif %}</span>
+    {% elif e.llm == "error" %}<span class="tag amber">{{ triggers.ai_name }} не ответил</span>
+      <span class="muted">{{ e.extraction.error|default:e.markup.error|truncatechars:260 }}. Разбор сделан по словарю; после исправления загрузите протокол заново.</span>
+    {% elif e.configured %}<span class="muted">Протокол разобран до подключения {{ triggers.ai_name }}: загрузите его заново, чтобы разметили оба.</span>
+    {% else %}<span class="muted">ИИ-агент не подключён (LLM_PROVIDER), разметка только по словарю.</span>{% endif %}</p>{% endwith %}
+  <div class="trig-summary">
+    <div class="trig-total"><b>{{ triggers.stats.triggers|default:0 }}</b><span>триггеров</span></div>
+    {% for t in triggers.by_type %}<div class="tg-{{ t.key }} trig-kpi"><b>{{ t.count }}</b><span>{{ t.title }}</span></div>{% endfor %}
+    <div class="trig-kpi muted-kpi"><b>{{ triggers.stats.markers_counted|default:0 }}</b><span>маркеров{% if triggers.stats.subsumed %}, ещё {{ triggers.stats.subsumed }} внутри находок{% endif %}</span></div>
+    <div class="trig-kpi muted-kpi"><b>{{ triggers.stats.overlaps|default:0 }}</b><span>перекрытий в подсветке</span></div>
+    {% if triggers.stats.corrected %}<div class="trig-kpi muted-kpi"><b>{{ triggers.stats.corrected }}</b><span>найдено после исправления опечатки</span></div>{% endif %}
+  </div>
+  {% if triggers.engines.llm == "ok" %}<div class="trig-summary mt-s source-summary">
+    {% for src in triggers.sources %}<div class="trig-kpi src-{{ src.key }}"><span class="src-title">{{ src.title }}</span><b>триггеры {{ src.triggers }} · маркеры {{ src.markers }}</b></div>{% endfor %}
+  </div>{% endif %}
+  {% if triggers.markers_by_type %}<div class="tags mt-s">{% for m in triggers.markers_by_type %}<span class="tag gray"><i class="lg lg-{{ m.key }}"></i>{{ m.title }}: {{ m.count }}</span>{% endfor %}</div>{% endif %}
+  {% if triggers.items %}
+  <div class="table-wrap mt-s"><table class="table trig-table">
+    <thead><tr><th>№</th><th>Тип</th><th>Доказательство в тексте</th><th>Уверенность</th><th>Правило</th><th>Кто нашёл</th><th>Куда</th><th></th></tr></thead>
+    <tbody>{% for t in triggers.items %}
+      <tr id="trig-{{ t.id }}" class="trig-row tg-{{ t.type }}">
+        <td><b>{{ t.number }}</b></td>
+        <td><span class="tag {% if t.type == 'emergency' %}red{% elif t.type == 'review' %}amber{% else %}blue{% endif %}">{{ t.type_title }}</span></td>
+        <td>«{{ t.evidence|truncatechars:140 }}»{% if t.also %}<div class="small muted">ещё {{ t.also|length }} {% if t.also|length == 1 %}место{% else %}места{% endif %} в тексте: {% for a in t.also %}«{{ a.text|truncatechars:40 }}»{% if not forloop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+          {% if t.context and t.context != t.evidence %}<div class="small muted">фраза: «{{ t.context|truncatechars:120 }}»</div>{% endif %}</td>
+        <td class="nowrap"><div class="conf conf-{{ t.level }}" title="{% for f in t.factors %}{{ f.reason }}{% if not forloop.last %}; {% endif %}{% endfor %}"><span style="width:{{ t.percent }}%"></span></div>
+          <span class="small">{{ t.percent }}% · {{ t.level|human:"confidence_level" }}</span></td>
+        <td>{{ t.rule_title }}<div><code class="small">{{ t.rule_id }}</code></div></td>
+        <td>{% if t.source == "both" %}<span class="tag green">словарь и {{ triggers.ai_name }}</span>{% else %}<span class="tag gray">словарь</span>{% endif %}</td>
+        <td>{{ t.target.route_title|default:"—" }}{% if t.specialty_title %}<div class="small muted">первый этап: {{ t.specialty_title }}</div>{% endif %}</td>
+        <td><a href="#ev-text" class="btn btn-light btn-sm" data-goto="{{ t.id }}">В тексте</a></td>
+      </tr>{% endfor %}</tbody></table></div>
+  {% elif not triggers.ai_items %}<p class="muted mt-s">Триггеров нет: маршрут не запускается, проверка не нужна.</p>{% endif %}
+
+  {% if triggers.ai_items or triggers.ai_markers %}
+  <div class="ai-only mt" id="ai-only">
+    <h3>{% icon "sparkles" "sm" %} Найдено только {{ triggers.ai_name }} <span class="tag violet">словарь этого не нашёл, проверьте</span></h3>
+    <p class="small muted">Каждая строка опирается на дословную цитату из протокола. В тексте такие места обведены пунктиром и помечены «ИИ».</p>
+    {% if triggers.ai_items %}
+    <div class="table-wrap mt-s"><table class="table trig-table">
+      <thead><tr><th>№</th><th>Триггер</th><th>Цитата</th><th>Уверенность</th><th>Куда</th><th></th></tr></thead>
+      <tbody>{% for t in triggers.ai_items %}
+        <tr id="trig-{{ t.id }}" class="trig-row tg-{{ t.type }} ai-row">
+          <td><b>{{ t.number }}</b></td>
+          <td><span class="tag {% if t.type == 'emergency' %}red{% elif t.type == 'review' %}amber{% else %}blue{% endif %}">{{ t.type_title }}</span><div class="small">{{ t.title }}</div></td>
+          <td>«{{ t.evidence|truncatechars:140 }}»</td>
+          <td class="nowrap"><div class="conf conf-{{ t.level }}"><span style="width:{{ t.percent }}%"></span></div><span class="small">{{ t.percent }}% · {{ t.level|human:"confidence_level" }}</span></td>
+          <td>{{ t.target.route_title|default:"—" }}{% if t.specialty_title %}<div class="small muted">первый этап: {{ t.specialty_title }}</div>{% endif %}</td>
+          <td><a href="#ev-text" class="btn btn-light btn-sm" data-goto="{{ t.id }}">В тексте</a></td>
+        </tr>{% endfor %}</tbody></table></div>
+    {% endif %}
+    {% if triggers.ai_markers %}
+    <div class="table-wrap mt-s"><table class="table">
+      <thead><tr><th>Признак</th><th>Цитата</th><th>Раздел</th><th>Уверенность</th><th></th></tr></thead>
+      <tbody>{% for m in triggers.ai_markers %}
+        <tr class="ai-row"><td>{{ m.title }}</td><td>«{{ m.text|truncatechars:140 }}»</td>
+          <td class="small">{% if m.section == "conclusion" %}заключение{% else %}описание{% endif %}</td>
+          <td class="nowrap small">{{ m.percent }}% · {{ m.level|human:"confidence_level" }}</td>
+          <td><a href="#ev-text" class="btn btn-light btn-sm" data-goto-m="{{ m.id }}">В тексте</a></td></tr>{% endfor %}</tbody></table></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

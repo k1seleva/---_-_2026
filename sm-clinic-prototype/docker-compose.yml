@@ -1,0 +1,44 @@
+# Полный контур: web + Celery worker (события) + worker-llm (разбор протоколов моделью) + beat + PostgreSQL + Redis.
+# Локальная LLM (раскомментировать ollama) — данные не покидают контур клиники.
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    DB_ENGINE: django.db.backends.postgresql
+    DB_NAME: sm_clinic
+    DB_USER: sm
+    DB_PASSWORD: sm
+    DB_HOST: db
+    CELERY_TASK_ALWAYS_EAGER: "0"
+    CELERY_BROKER_URL: redis://redis:6379/0
+    EVENT_BUS_BACKEND: celery
+  depends_on: [db, redis]
+
+services:
+  web:
+    <<: *app
+    command: sh -c "python manage.py migrate && python manage.py seed_demo && python manage.py collectstatic --noinput && gunicorn config.wsgi:application -b 0.0.0.0:8000"
+    ports: ["8000:8000"]
+  worker:
+    <<: *app
+    command: celery -A config worker -l info -Q celery
+  # Разбор протоколов и советы ИИ: отдельная очередь llm, по одной задаче на процесс. Число процессов —
+  # сколько запросов одновременно тянет сервер модели (OLLAMA_NUM_PARALLEL), обычно 1–2.
+  worker-llm:
+    <<: *app
+    command: sh -c "celery -A config worker -l info -Q llm -n llm@%h --concurrency $${PROCESSING_WORKERS:-1} --prefetch-multiplier 1"
+  beat:
+    <<: *app
+    command: celery -A config beat -l info
+  db:
+    image: postgres:16
+    environment: {POSTGRES_DB: sm_clinic, POSTGRES_USER: sm, POSTGRES_PASSWORD: sm}
+    volumes: [pgdata:/var/lib/postgresql/data]
+  redis:
+    image: redis:7
+  # ollama:
+  #   image: ollama/ollama
+  #   volumes: [ollama:/root/.ollama]
+
+volumes:
+  pgdata: {}

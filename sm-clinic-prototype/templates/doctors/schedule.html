@@ -1,0 +1,24 @@
+{% extends "workspace/base.html" %}
+{% block title %}{{ doctor.full_name }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs"><a href="{% url 'doctors:choose' %}">Приём врача</a></div><h1>{{ doctor.full_name }}</h1></div></div>
+<div class="grid grid-2" style="align-items:start">
+  <div class="card">
+    <h2>Записанные пациенты</h2>
+    <div class="table-wrap"><table><thead><tr><th>Время</th><th>Пациент</th><th>Статус</th></tr></thead>
+      {% for a, name in appointments %}
+      <tr><td>{{ a.slot.starts_at|date:"d.m H:i" }}<div class="small muted">{{ a.slot.location.title }}</div></td>
+        <td><a href="{% url 'doctors:appointment' a.pk %}">{{ name }}</a>{% if a.route_id %} <span class="tag blue">по маршруту</span>{% endif %}</td>
+        <td><span class="tag {% if a.status == 'completed' %}green{% elif a.status == 'no_show' %}amber{% else %}blue{% endif %}">{{ a.get_status_display }}</span></td></tr>
+      {% empty %}<tr><td colspan="3" class="muted">Записей нет</td></tr>{% endfor %}
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>Ближайшие слоты</h2>
+    <div class="table-wrap"><table><tr><th>Время</th><th>Локация</th><th>Специальность</th><th>Статус</th></tr>
+      {% for s in upcoming %}<tr><td>{{ s.starts_at|date:"d.m H:i" }}</td><td>{{ s.location.title }}</td><td class="small">{{ s.specialty.title }}</td><td><span class="tag {% if s.status == 'free' %}green{% else %}gray{% endif %}">{{ s.get_status_display }}</span></td></tr>{% endfor %}
+    </table></div>
+    <p class="small muted">Сетка слотов — заглушка контракта сервиса расписания 1С.</p>
+  </div>
+</div>
+{% endblock %}

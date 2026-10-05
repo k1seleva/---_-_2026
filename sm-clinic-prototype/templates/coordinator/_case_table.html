@@ -1,0 +1,21 @@
+{# Строки протоколов: что за исследование, чей, где, категория и причины-метки, короткое «почему». #}
+<div class="table-wrap"><table>
+  <thead><tr>{% if selectable %}<th><span class="sr-only">Выбрать</span></th>{% endif %}<th>Исследование</th><th>Пациент</th><th>Категория и метки</th><th>Почему</th><th>Загружен</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr class="row-link" data-href="{% url 'coordinator:case' r.case.document_id %}">
+    {% if selectable %}<td><input type="checkbox" name="case" value="{{ r.case.document_id }}" form="bulk" aria-label="Выбрать {{ r.case.filename }}"></td>{% endif %}
+    <td><a href="{% url 'coordinator:case' r.case.document_id %}"><b>{{ r.case.study_type|default:"Тип не распознан" }}</b></a>
+      <div class="small muted">{{ r.case.filename|truncatechars:48 }}{% if r.case.version > 1 %} · версия {{ r.case.version }}{% endif %}</div></td>
+    <td>{% if r.case.is_placeholder %}<span class="tag violet">{{ r.patient }}</span>{% if r.case.card_number %}<div class="small muted">в протоколе: «{{ r.case.card_number|truncatechars:30 }}»</div>{% endif %}
+        {% else %}{{ r.patient }}{% endif %}<div class="small muted">{{ r.clinic }}</div></td>
+    <td><div class="tags"><span class="tag {{ r.color }}">{{ r.case.category|human:"case_category" }}</span>
+      {% for t in r.reasons %}<span class="tag {{ t.color }}" title="{{ t.description }}">{{ t.title }}</span>{% endfor %}
+      {% for t in r.tags %}<span class="tag custom {{ t.color }}">{{ t.title }}</span>{% endfor %}</div></td>
+    <td class="small" style="min-width:220px">{% if r.why %}<b>{{ r.why.finding }}</b>{% if r.why.quote %}<div class="muted">«{{ r.why.quote|truncatechars:60 }}»</div>{% endif %}{% if r.why.rule and r.why.rule != r.why.finding %}<div>правило «{{ r.why.rule|truncatechars:50 }}»</div>{% endif %}
+      {% elif r.case.error %}<span class="muted">{{ r.case.error|truncatechars:80 }}</span>{% elif r.case.category == 'no_findings' %}<span class="muted">Значимых находок нет</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+    <td class="small nowrap muted">{{ r.case.uploaded_at|ago }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="6"><div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Здесь пусто</div><div>В этой категории протоколов нет</div></div></td></tr>{% endfor %}
+  </tbody>
+</table></div>

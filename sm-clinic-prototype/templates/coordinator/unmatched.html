@@ -1,0 +1,37 @@
+{% extends "workspace/base.html" %}
+{% block title %}Обезличенные пациенты{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Маршруты и протоколы</div><h1>Обезличенные пациенты</h1></div></div>
+<div class="note" style="margin-bottom:16px">Сюда попадают протоколы, в которых система не нашла номер карты пациента из МИС. Протоколы с одинаковой записью в поле «карта» собраны в одну карточку.
+  Пока пациент не выбран, маршрут не строится и уведомления никому не уходят. Экстренная находка всё равно создаёт срочную задачу.</div>
+
+{% for card in cards %}
+<div class="card" {% if card.emergency %}style="border:2px solid var(--red-soft)"{% endif %}>
+  <div class="card-head">
+    <div class="row"><span class="avatar" style="background:var(--violet-soft);color:var(--violet)">{% icon "user-question" "sm" %}</span>
+      <div><h2 style="margin:0">{{ card.p.display_name }}</h2>
+        <div class="small muted">{% if card.p.card_hint %}В протоколе указано: «{{ card.p.card_hint }}»{% else %}Номера карты в протоколе нет{% endif %} · {{ clinics|get_item:card.p.location_code|default:"клиника не указана" }} · создана {{ card.p.created_at|ago }}</div></div></div>
+    <div class="tags">{% if card.emergency %}<span class="tag red">Экстренная находка</span>{% endif %}<span class="tag violet">{{ card.rows|length }} {{ card.rows|length|ru_plural:"протокол,протокола,протоколов" }}</span></div>
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Исследование</th><th>Дата</th><th>Метки</th><th>Что найдено</th></tr></thead>
+    {% for r in card.rows %}<tr class="row-link" data-href="{% url 'coordinator:case' r.case.document_id %}">
+      <td><a href="{% url 'coordinator:case' r.case.document_id %}"><b>{{ r.case.study_type|default:"Тип не распознан" }}</b></a><div class="small muted">{{ r.case.filename|truncatechars:50 }}</div></td>
+      <td class="small nowrap">{{ r.case.study_date|date:"d.m.Y"|default:"не указана" }}</td>
+      <td><div class="tags"><span class="tag {{ r.color }}">{{ r.case.category|human:"case_category" }}</span>{% for t in r.reasons %}{% if t.code != 'unmatched' %}<span class="tag {{ t.color }}">{{ t.title }}</span>{% endif %}{% endfor %}</div></td>
+      <td class="small">{{ r.findings|join:", "|default:"—" }}</td></tr>{% endfor %}
+  </table></div>
+  <div class="grid grid-2 mt">
+    <form method="post" action="{% url 'coordinator:unmatched_assign' card.p.id %}">{% csrf_token %}
+      <label for="p-{{ card.p.id }}">Это пациент клиники</label>
+      <div class="field-row"><select id="p-{{ card.p.id }}" name="patient_id" required><option value="">Найдите пациента</option>{% for p in patients %}<option value="{{ p.id }}">{{ p.display_name }} · карта {{ p.external_mis_id }}</option>{% endfor %}</select>
+        <button class="btn btn-primary">Привязать все</button></div></form>
+    <form method="post" action="{% url 'coordinator:unmatched_assign' card.p.id %}">{% csrf_token %}<input type="hidden" name="op" value="create">
+      <label for="n-{{ card.p.id }}">Нового пациента ещё нет в списке</label>
+      <div class="field-row"><input id="n-{{ card.p.id }}" name="new_mis_id" placeholder="Номер карты в МИС" required><input name="new_name" placeholder="ФИО"><button class="btn btn-light">Создать и привязать</button></div></form>
+  </div>
+</div>
+{% empty %}
+<div class="card"><div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Все протоколы привязаны к пациентам</div><div>Если номер карты не распознается, протокол появится здесь</div></div></div>
+{% endfor %}
+{% endblock %}

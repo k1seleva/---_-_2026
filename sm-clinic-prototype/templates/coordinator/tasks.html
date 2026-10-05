@@ -1,0 +1,11 @@
+{% extends "workspace/base.html" %}
+{% block title %}Задачи{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Маршруты и протоколы</div><h1>Задачи координатора</h1></div></div>
+{% if urgent %}<h2>{% icon "alert" %} Срочно</h2>{% endif %}
+{% for t, name in urgent %}{% include "coordinator/_task.html" %}{% endfor %}
+<h2 class="mt">В работе</h2>
+{% for t, name in other %}{% include "coordinator/_task.html" %}{% empty %}<div class="card"><div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Открытых задач нет</div></div></div>{% endfor %}
+{% if done %}<details class="card mt"><summary><b>Недавно выполненные</b> <span class="small muted">{{ done|length }}</span></summary>
+  {% for t in done %}<div class="list-row"><span class="circle">{% icon "check" "sm" %}</span><span class="grow"><b>{{ t.task_type|human:"task_type" }}</b><span class="small muted" style="display:block">{{ t.resolution }} · {{ t.updated_at|ago }}</span></span></div>{% endfor %}</details>{% endif %}
+{% endblock %}

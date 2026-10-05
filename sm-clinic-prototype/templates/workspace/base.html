@@ -1,0 +1,103 @@
+{% extends "base.html" %}{% load static %}
+{% block body %}
+{# Рабочее место сотрудника. Координатор: входящие, маршруты, аналитика, клиника, поиск и колокольчик. Врач: только своё расписание и приём. #}
+<div class="ws">
+  <aside class="ws-side" aria-label="Меню рабочего места">
+    {% if ws_role == "doctor" %}
+    <a class="ws-logo" href="{% url 'doctors:choose' %}"><span class="mark">СМ</span><span>СМ-Клиника<small>Рабочее место врача</small></span></a>
+    <nav>
+      <div class="side-group side-nav">
+        <a href="{% url 'doctors:choose' %}" class="active">{% icon "stethoscope" %}Моё расписание и приём</a>
+      </div>
+    </nav>
+    {% else %}
+    <a class="ws-logo" href="{% url 'coordinator:home' %}"><span class="mark">СМ</span><span>СМ-Клиника<small>Рабочее место координатора</small></span></a>
+    {% with s=ws_section c=ws_counts %}
+    <nav>
+      <div class="side-group side-nav">
+        <a href="{% url 'coordinator:home' %}" class="{% if s == 'home' %}active{% endif %}">{% icon "home" %}Главная</a>
+      </div>
+      <div class="side-group">
+        <div class="side-group-title">Маршруты и протоколы</div>
+        <div class="side-nav">
+          <a href="{% url 'coordinator:inbox' %}" class="{% if s == 'inbox' %}active{% endif %}">{% icon "inbox" %}Входящие{% if c.inbox %}<span class="pill {% if c.emergency %}red{% endif %}">{{ c.inbox }}</span>{% endif %}</a>
+          <a href="{% url 'processing:upload' %}" class="{% if s == 'upload' %}active{% endif %}">{% icon "upload" %}Загрузка протоколов</a>
+          <a href="{% url 'coordinator:unmatched' %}" class="{% if s == 'unmatched' %}active{% endif %}">{% icon "user-question" %}Обезличенные{% if c.unmatched %}<span class="pill">{{ c.unmatched }}</span>{% endif %}</a>
+          <a href="{% url 'coordinator:routes' %}" class="{% if s == 'routes' %}active{% endif %}">{% icon "route" %}Маршруты</a>
+          <a href="{% url 'coordinator:tasks' %}" class="{% if s == 'tasks' %}active{% endif %}">{% icon "tasks" %}Задачи{% if c.tasks %}<span class="pill {% if c.urgent_tasks %}red{% endif %}">{{ c.tasks }}</span>{% endif %}</a>
+          <a href="{% url 'coordinator:audits' %}" class="{% if s == 'audits' %}active{% endif %}">{% icon "chat" %}Обсуждения{% if c.reviews %}<span class="pill">{{ c.reviews }}</span>{% endif %}</a>
+        </div>
+      </div>
+      <div class="side-group">
+        <div class="side-group-title">Аналитика</div>
+        <div class="side-nav">
+          <a href="{% url 'coordinator:analytics' %}" class="{% if s == 'analytics' %}active{% endif %}">{% icon "chart" %}Дашборд</a>
+          <a href="{% url 'coordinator:clinics' %}" class="{% if s == 'clinics' %}active{% endif %}">{% icon "building" %}По клиникам</a>
+          <a href="{% url 'coordinator:features' %}" class="{% if s == 'features' %}active{% endif %}">{% icon "layers" %}Признаки и проверки</a>
+          <a href="{% url 'processing:quality' %}" class="{% if s == 'quality' %}active{% endif %}">{% icon "flask" %}Качество разбора</a>
+        </div>
+      </div>
+      <div class="side-group">
+        <div class="side-group-title">Настройки</div>
+        <div class="side-nav">
+          <a href="{% url 'coordinator:tags' %}" class="{% if s == 'tags' %}active{% endif %}">{% icon "tag" %}Метки</a>
+          <a href="{% url 'coordinator:priorities' %}" class="{% if s == 'priorities' %}active{% endif %}">{% icon "sliders" %}Мои приоритеты</a>
+          <a href="/admin/">{% icon "book" %}Справочники</a>
+        </div>
+      </div>
+    </nav>
+    {% endwith %}
+    {% endif %}
+  </aside>
+
+  <div class="ws-main">
+    <header class="ws-top"><div class="bar">
+      {% if ws_role == "coordinator" %}
+      <form class="clinic" method="post" action="{% url 'coordinator:clinic' %}" data-autosubmit>{% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <label class="sr-only" for="ws-clinic">Клиника</label>
+        <select id="ws-clinic" name="clinic">
+          <option value="">Все клиники</option>
+          {% for code, title in ws_clinics.items %}<option value="{{ code }}" {% if code == ws_clinic %}selected{% endif %}>{{ title }}</option>{% endfor %}
+        </select>
+        <noscript><button class="btn btn-sm btn-light">Выбрать</button></noscript>
+      </form>
+      <form class="search" method="get" action="{% url 'coordinator:search' %}" role="search">
+        {% icon "search" %}<label class="sr-only" for="ws-q">Поиск</label>
+        <input id="ws-q" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Пациент, номер карты или файл протокола">
+      </form>
+      {% else %}<div style="flex:1"></div>{% endif %}
+      <div class="right row" style="gap:14px">
+        {% if ws_queue.active %}<a class="queue-chip" href="{% url 'coordinator:inbox' %}?{% if ws_queue.batch_id %}batch={{ ws_queue.batch_id }}&{% endif %}category=all" title="Протоколы разбираются в фоне: открыть ход разбора">
+          <span class="spin" aria-hidden="true"></span>Идёт разбор: {{ ws_queue.active }} {{ ws_queue.active|ru_plural:"протокол,протокола,протоколов" }}</a>{% endif %}
+        {% if ws_role == "coordinator" %}
+        <div class="bell">
+          <button class="bell-btn" type="button" data-popover-toggle aria-controls="ws-bell" aria-expanded="false" aria-label="Срочное: {{ ws_bell|length }}">
+            {% icon "bell" %}{% if ws_counts.emergency or ws_counts.urgent_tasks %}<span class="pill red" data-bell-count>{{ ws_counts.emergency|add:ws_counts.urgent_tasks }}</span>{% endif %}
+          </button>
+          <div class="popover" id="ws-bell" hidden role="dialog" aria-label="Срочное">
+            <div class="pop-head"><h3>Срочное</h3><span class="muted small">{{ ws_bell|length }}</span></div>
+            <div class="pop-list">
+              {% for b in ws_bell %}
+              <a class="pop-item" href="{{ b.url }}" style="color:inherit;text-decoration:none">
+                <span class="ico {{ b.tone }}">{% icon b.icon "sm" %}</span>
+                <span><span class="t">{{ b.title }}</span><span class="b" style="display:block">{{ b.body|truncatechars:90 }}</span><span class="when">{{ b.when|ago }}</span></span>
+              </a>
+              {% empty %}<div class="pop-empty">{% icon "check" "lg" %}<div>Срочных дел нет</div></div>{% endfor %}
+            </div>
+            <div class="pop-foot"><a href="{% url 'coordinator:tasks' %}">Все задачи</a><a href="{% url 'coordinator:inbox' %}?category=emergency">Экстренные протоколы</a></div>
+          </div>
+        </div>
+        {% endif %}
+        <span class="user"><span class="avatar">{{ ws_user|initials }}</span><span>{{ ws_user }}<small class="muted" style="display:block;font-weight:400">{{ ws_role_title }}</small></span></span>
+        {% if ws_role %}<form method="post" action="{% url 'staff_logout' %}">{% csrf_token %}<button class="btn btn-sm btn-light" title="Выйти из рабочего места">Выйти</button></form>{% endif %}
+      </div>
+    </div></header>
+    <main class="ws-content">
+      {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/ui.js' %}"></script>{% block page_scripts %}{% endblock %}{% endblock %}

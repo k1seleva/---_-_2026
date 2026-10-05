@@ -1,0 +1,43 @@
+{# Советы ИИ-агента. Отдельный блок: не смешивается с маркерами и триггерами, маршрут не меняет. #}
+<div class="card advice-card" id="advice">
+  <div class="card-head"><h2>{% icon "sparkles" %} Рекомендации агента по маршрутизации</h2>
+    <span class="tag violet">рекомендация ИИ, требует проверки координатором</span></div>
+  {% with m=advice.meta %}
+  <p class="small muted">
+    {% if m.engine == "qwen" and m.status == "ready" %}<span class="tag violet">Ответ {{ advice.ai_name }}</span> модель {{ m.model }}{% if advice.duration %}, ответ за {{ advice.duration }}{% endif %}, версия промпта {{ m.prompt_version }}.
+      {% if m.proposed is not None %}Модель предложила советов: {{ m.proposed }}, после проверки цитат осталось {{ m.accepted|default:0 }}.{% endif %}
+    {% elif m.status == "pending" and m.engine == "qwen" %}<span class="tag violet">{{ advice.ai_name }} готовит ответ</span> модель {{ m.model }}. Обновите страницу через минуту.
+    {% elif m.engine == "demo" %}Демо-режим: модель Qwen не подключена, советы собраны правилами из триггеров, чтобы проверить оценку.
+    {% elif m.status == "off" %}Советы агента выключены в настройках.{% endif %}
+    Совет не меняет маршрут: оценка сохраняется отдельно, правку маршрута делают в его карточке.
+    {% if m.rejected %}Отброшено при проверке: {{ m.rejected|length }} (нет цитаты в протоколе, маршрута в справочнике или совет повторяется).{% endif %}</p>
+  {% if m.status == "error" %}<div class="note warn">{{ advice.ai_name }} не ответил{% if m.model %} (модель {{ m.model }}){% endif %}: {{ m.error }}. Разбор протокола и маршрут от этого не зависят.</div>{% endif %}
+  {% if advice.can_ask_model %}<div class="note violet mt-s">Сейчас подключён {{ advice.ai_name }} ({{ advice.configured_model }}), а эти советы собраны {% if m.engine == "demo" %}в демо-режиме{% else %}до его подключения{% endif %}.
+    <form method="post" action="{% url 'coordinator:advice_regenerate' case.document_id %}" class="inline-form">{% csrf_token %}<button class="btn btn-sm">{% icon "sparkles" "sm" %}Получить ответ {{ advice.ai_name }}</button></form></div>{% endif %}
+  {% endwith %}
+  {% for a in advice.items %}
+  <div class="advice">
+    <div class="row between"><b>{{ a.seq }}. {{ a.text }}</b>
+      <span class="small nowrap">уверенность модели {{ a.percent }}%</span></div>
+    <div class="why-chain mt-s">
+      <div><span class="k">Обоснование</span>{{ a.rationale }}</div>
+      <div><span class="k">Цитата</span>«{{ a.evidence_quote|truncatechars:200 }}»</div>
+      <div><span class="k">Куда</span>{{ a.target_route_title|default:"маршрут не указан" }}{% if a.specialty_title %} · {{ a.specialty_title }}{% endif %}{% if a.target_executor %} · исполнитель: {{ a.target_executor }}{% endif %}
+        {% if a.target_route_code %}{% if a.matches_matrix %}<span class="tag green">совпадает с маршрутом по правилам</span>{% else %}<span class="tag amber">расходится с маршрутом по правилам</span>{% endif %}{% endif %}</div>
+    </div>
+    {% if a.review %}<div class="small mt-s advice-verdict v-{{ a.review.verdict }}">Оценка: <b>{{ a.review.get_verdict_display }}</b> · {{ a.review.user_id }} · {{ a.review.timestamp|date:"d.m.Y H:i" }}{% if a.review.comment %} · «{{ a.review.comment }}»{% endif %}{% if a.review.corrected_route_code %} · предложен маршрут: {{ a.review.corrected_route_code|human:"route_template" }}{% endif %}</div>{% endif %}
+    <form method="post" action="{% url 'coordinator:advice_review' case.document_id a.id %}" class="advice-form mt-s">{% csrf_token %}
+      <div class="ev-modes" role="radiogroup" aria-label="Оценка совета">
+        {% for value, title in advice.verdicts %}<label><input type="radio" name="verdict" value="{{ value }}" required{% if a.review.verdict == value %} checked{% endif %}> {{ title }}</label>{% endfor %}
+      </div>
+      <div class="field-row">
+        <select name="route_code" aria-label="Маршрут вместо совета (для «Скорректировать»)"><option value="">Маршрут вместо совета</option>{% for r in advice.catalog %}<option value="{{ r.code }}">{{ r.title }}</option>{% endfor %}</select>
+        <input name="comment" placeholder="Комментарий (обязателен, если отклонить или скорректировать)" style="flex:1">
+        <button class="btn btn-sm btn-light">Сохранить оценку</button>
+      </div>
+    </form>
+  </div>
+  {% empty %}<p class="muted">{% if advice.meta.status == "ready" %}Агенту нечего посоветовать: триггеров нет.{% elif advice.meta.status %}Советов нет.{% else %}Советы ещё не сформированы.{% endif %}</p>{% endfor %}
+  {% if advice.meta.raw %}<details class="advice-raw mt-s"><summary>Ответ модели целиком{% if advice.meta.status == "error" %} (не разобран по схеме){% endif %}</summary><pre>{{ advice.raw }}</pre></details>{% endif %}
+  {% if not advice.can_ask_model %}<form method="post" action="{% url 'coordinator:advice_regenerate' case.document_id %}" class="mt-s">{% csrf_token %}<button class="btn btn-sm btn-light">{% icon "refresh" "sm" %}{% if advice.configured_engine == "qwen" %}Спросить {{ advice.ai_name }} ещё раз{% else %}Сформировать заново{% endif %}</button></form>{% endif %}
+</div>

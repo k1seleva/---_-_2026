@@ -1,0 +1,15 @@
+Django>=5.0,<6.0
+djangorestframework>=3.15
+python-dotenv>=1.0     # load_dotenv: настройки из .env при запуске без Docker
+celery>=5.4
+redis>=5.0              # брокер Celery в docker-compose
+python-docx>=1.1
+pydantic>=2.6
+langchain-core>=0.3
+langchain>=0.3          # init_chat_model: openai / anthropic / ollama / ...
+langchain-ollama>=0.3   # Qwen через Ollama в контуре клиники (LLM_PROVIDER=ollama)
+# Другие провайдеры — по выбору (для реальных ПДн только в контуре клиники):
+# langchain-openai      # Qwen через LM Studio / vLLM (OpenAI-совместимый API)
+# langchain-gigachat    # GigaChat
+psycopg[binary]>=3.1    # PostgreSQL в пилоте
+gunicorn>=22.0

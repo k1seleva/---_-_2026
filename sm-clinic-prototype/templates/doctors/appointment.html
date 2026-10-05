@@ -1,0 +1,66 @@
+{% extends "workspace/base.html" %}
+{% block title %}Приём{% endblock %}
+{% block content %}
+<p class="small muted">Прототип экрана МИС 1С «Приём врача» с доработками: баннер маршрута, баннер незавершённого маршрута, обязательная тактика.</p>
+<div class="mis">
+  <div class="mis-title">Приём врача: {{ patient.display_name }} (карта {{ patient.external_mis_id }}) — {{ appt.slot.starts_at|date:"d.m.Y H:i" }}, {{ appt.slot.doctor.full_name }}</div>
+  <div class="mis-body">
+    {% if ctx.banner %}
+    <div class="mis-banner alert">
+      <b>{{ ctx.banner.title }}.</b><br>
+      Основание: {{ ctx.banner.basis }}{% if ctx.banner.evidence %} — «{{ ctx.banner.evidence|truncatechars:160 }}»{% endif %}.<br>
+      {% if ctx.banner.potential_route %}Потенциальный маршрут: {{ ctx.banner.potential_route }}.<br>{% endif %}
+      {{ ctx.banner.text }} <span style="color:#777">({{ ctx.banner.rule }})</span>
+    </div>
+    {% endif %}
+    {% for r in ctx.unfinished_routes %}
+    <div class="mis-banner"><b>Незавершённый клинический маршрут.</b> {{ r.detected_at|date:"d.m.Y" }}: {{ r.reason }}. Статус: {{ r.status_display }}.</div>
+    {% endfor %}
+
+    <div class="grid grid-2">
+      <fieldset><legend>Результаты исследования</legend>
+        {% if ctx.document %}
+          <div><b>{{ ctx.document.study_type }}</b> от {{ ctx.document.study_date|isodate|date:"d.m.Y" }}</div>
+          <div style="margin:6px 0"><b>Заключение:</b> {{ ctx.document.conclusion|truncatechars:500 }}</div>
+          {% include "processing/_annotation.html" with annotation=ctx.annotation compact=True pin_doc=ctx.document.id %}
+          {% for a in ctx.audit_notes %}<div class="mis-banner" style="margin-top:8px"><b>Проверка рекомендаций:</b> {{ a.summary }}</div>{% endfor %}
+        {% else %}<i>Нет связанного исследования</i>{% endif %}
+      </fieldset>
+      <fieldset><legend>Текущий маршрут</legend>
+        {% if ctx.route %}<div>Статус: <b>{{ ctx.route.status_display }}</b></div>
+          <ol>{% for s in ctx.route.steps %}<li>{{ s.title }} — <i>{{ s.status_display }}</i></li>{% endfor %}</ol>
+        {% else %}<i>Пациент записан вне маршрута</i>{% endif %}
+      </fieldset>
+    </div>
+
+    {% if outcome %}
+      <fieldset><legend>Итог приёма</legend>Тактика: <b>{{ outcome.get_tactic_display }}</b>{% for p in outcome.prescriptions.all %}<br>Назначение: {{ p.title }}{% if p.due_in_days %} (через {{ p.due_in_days }} дн.){% endif %}{% endfor %}</fieldset>
+    {% elif appt.status == 'no_show' %}
+      <fieldset><legend>Итог</legend>Неявка. Пациенту предложена перезапись.</fieldset>
+    {% else %}
+    <form method="post" action="{% url 'doctors:complete' appt.pk %}">{% csrf_token %}
+      <fieldset class="tactics"><legend>Тактика (обязательно для завершения приёма)</legend>
+        {% for value, label in tactics %}<label><input type="radio" name="tactic" value="{{ value }}" required> {{ label }}</label>{% endfor %}
+        <label class="select" style="margin-top:8px">Профиль (если «Направление в другой профиль»)
+          <select name="next_specialty"><option value="">—</option>{% for s in specialties %}<option value="{{ s.code }}">{{ s.title }}</option>{% endfor %}</select></label>
+      </fieldset>
+      <fieldset><legend>Назначения и корректировка рекомендаций</legend>
+        {% for i in "012" %}
+        <div class="row" style="margin-bottom:6px">
+          <select name="p{{ i }}_kind" style="width:160px"><option value="diagnostics">Обследование</option><option value="consultation">Консультация</option><option value="follow_up">Контрольный визит</option><option value="surgery">Операция</option></select>
+          <input name="p{{ i }}_title" placeholder="Например: МРТ ОМТ / Гистероскопия" style="flex:1;width:auto">
+          <select name="p{{ i }}_specialty" style="width:180px"><option value="">специалист —</option>{% for s in specialties %}<option value="{{ s.code }}">{{ s.title }}</option>{% endfor %}</select>
+          <input name="p{{ i }}_due" type="number" min="0" placeholder="через, дн." style="width:110px">
+        </div>
+        {% endfor %}
+        <label><input type="checkbox" name="agrees" checked style="width:auto"> Согласен с маршрутом, предложенным системой</label>
+        <input name="disagreement_reason" placeholder="Если не согласен — почему (уйдёт координатору)">
+        <textarea name="comment" rows="2" placeholder="Комментарий" style="margin-top:6px"></textarea>
+      </fieldset>
+      <button class="btn btn-primary">Завершить приём</button>
+    </form>
+    <form method="post" action="{% url 'doctors:no_show' appt.pk %}" style="margin-top:8px">{% csrf_token %}<button class="btn">Отметить неявку</button></form>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

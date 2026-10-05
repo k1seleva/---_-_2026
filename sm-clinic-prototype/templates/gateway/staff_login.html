@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Вход: {{ role.title|lower }}{% endblock %}
+{% block body %}
+<header class="p-header"><div class="wrap"><span class="p-logo"><span class="mark">СМ</span><span>СМ-Клиника · рабочее место</span></span></div></header>
+<main class="wrap p-main">
+  {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+  <div class="login-box card">
+    <h1>Вход: {{ role.title|lower }}</h1>
+    <p class="muted">{% if role.code == "doctor" %}Ваше расписание, приём пациента и маршрут после приёма.{% else %}Входящие протоколы, маршруты пациентов, задачи и аналитика.{% endif %}</p>
+    {% if other_role %}<div class="note blue small">Сейчас вы вошли как «{{ other_role }}». Вход здесь сменит роль.</div>{% endif %}
+    {% if error %}<div class="note red" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" novalidate>{% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <label for="username">Логин</label>
+      <input id="username" name="username" value="{{ username }}" autocomplete="username" autocapitalize="none" required>
+      <label for="password">Пароль</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button class="btn btn-primary btn-block mt">Войти</button>
+    </form>
+    <p class="small muted mt">Учётную запись и роль выдаёт администратор клиники. В пилоте вход будет через единую учётную запись СМ-Клиники.</p>
+    <p class="small muted">Другие роли: {% if role.code != "coordinator" %}<a href="/coordinator/login/">координатор</a>{% else %}<a href="/doctor/login/">врач</a>{% endif %} · <a href="/patient/">пациент</a></p>
+    {% if demo %}<div class="note blue small">Демо-вход: логин <b>{{ demo.username }}</b>, пароль <b>{{ demo.password }}</b>.{% if role.code == "doctor" %} Врачи: doctor1…doctor9.{% endif %} Подсказка видна только в режиме разработки.</div>{% endif %}
+  </div>
+</main>
+{% endblock %}

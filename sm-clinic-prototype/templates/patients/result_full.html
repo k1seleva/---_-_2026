@@ -1,0 +1,9 @@
+{% extends "patients/base.html" %}
+{% block title %}Полный протокол{% endblock %}
+{% block content %}
+<div class="card">
+  <a class="small" href="{% url 'patients:result' patient.pk doc.id %}">← Простыми словами</a>
+  <h1 class="mt-s">{{ doc.study_type|default:"Протокол исследования" }}</h1>
+  <pre class="protocol">{{ text }}</pre>
+</div>
+{% endblock %}

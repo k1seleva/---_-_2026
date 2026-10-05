@@ -1,0 +1,14 @@
+{# Совет для пациентов старшего возраста: SMS приходят на любой телефон и не теряются. Ничего не меняется без согласия. #}
+{% if sms_hint %}
+<div class="hint" role="region" aria-label="Совет по уведомлениям">
+  <span class="circle">{% icon "sms" %}</span>
+  <div>
+    <div class="t">Получать сообщения ещё и по SMS?</div>
+    <div class="muted">SMS приходят на любой телефон, даже без интернета и приложения. Многие наши пациенты выбирают их, чтобы не пропустить результат и запись. Push-уведомления тоже останутся.</div>
+    <div class="acts">
+      <form method="post" action="{% url 'patients:settings' patient.pk %}">{% csrf_token %}<input type="hidden" name="op" value="sms_all"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-primary">{% icon "check" "sm" %}Включить SMS</button></form>
+      <form method="post" action="{% url 'patients:settings' patient.pk %}">{% csrf_token %}<input type="hidden" name="op" value="sms_dismiss"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-light">Оставить как есть</button></form>
+    </div>
+  </div>
+</div>
+{% endif %}

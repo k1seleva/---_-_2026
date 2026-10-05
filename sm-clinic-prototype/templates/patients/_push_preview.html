@@ -1,0 +1,26 @@
+{# Как push выглядит на телефоне пациента: экран блокировки. Ожидает push = services.push.push_preview(patient). #}
+<div class="push-demo">
+  <div class="phone" role="img" aria-label="Экран блокировки телефона с уведомлениями">
+    <div class="phone-time">{% now "H:i" %}</div>
+    <div class="phone-date">{% now "l, j E" %}</div>
+    {% for p in push.items %}
+    <div class="push">
+      <div class="push-head"><span class="push-app"><span class="mark">СМ</span>{{ p.app }}</span><span>{% if push.source == "example" %}сейчас{% else %}{{ p.when|ago }}{% endif %}</span></div>
+      <div class="push-title">{{ p.title }}</div>
+      <div class="push-body">{{ p.body }}</div>
+      <div class="push-action">{{ p.action }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="push-notes">
+    <h3>Так push выглядит на телефоне</h3>
+    <p class="small muted">{% if push.source == "sent" %}Последние push-уведомления, которые вам отправлены.{% elif push.source == "held" %}Этот push не отправлен: {{ push.reason|lower }}. Так он будет выглядеть на телефоне.{% else %}Пример: так придёт сообщение, когда будет готов результат исследования.{% endif %}</p>
+    <ul class="small">
+      <li>На экране блокировки нет диагноза и специальности врача: его могут увидеть посторонние.</li>
+      <li>Сразу виден следующий шаг: врач, дата, время и клиника ближайшего свободного приёма.</li>
+      <li>Подробности и выбор другого времени открываются после входа в личный кабинет.</li>
+      <li>С 21:00 до 9:00 push не приходят, и не больше трёх сообщений в сутки.</li>
+    </ul>
+    <a class="small" href="{% url 'patients:settings' patient.pk %}">Выбрать каналы: push, SMS или звонок</a>
+  </div>
+</div>

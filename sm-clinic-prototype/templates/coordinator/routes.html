@@ -1,0 +1,22 @@
+{% extends "workspace/base.html" %}
+{% block title %}Маршруты{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Маршруты и протоколы</div><h1>Маршруты пациентов</h1></div></div>
+<nav class="tabs"><a href="?status=open" class="{% if status == 'open' %}active{% endif %}">В работе</a><a href="?status=closed" class="{% if status == 'closed' %}active{% endif %}">Завершённые</a><a href="?status=all" class="{% if status == 'all' %}active{% endif %}">Все</a></nav>
+<form class="filters" method="get" data-autosubmit><input type="hidden" name="status" value="{{ status }}">
+  <label class="sr-only" for="tr">Триггер</label>
+  <select id="tr" name="trigger"><option value="">Все триггеры</option>{% for code, title in triggers.items %}<option value="{{ code }}" {% if code == trigger %}selected{% endif %}>{{ title }}</option>{% endfor %}</select>
+</form>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Пациент</th><th>Причина маршрута</th><th>Статус</th><th>Уведомлён</th><th>Записан</th><th>Эскалаций</th><th>Создан</th></tr></thead>
+  {% for x in rows %}<tr class="row-link" data-href="{% url 'coordinator:compare' x.r.route_id %}">
+    <td><a href="{% url 'coordinator:compare' x.r.route_id %}">{{ x.patient }}</a><div class="small muted">{{ x.r.location|human:"location" }}</div></td>
+    <td>{{ x.trigger|default:x.r.trigger_code|human:"trigger" }}</td>
+    <td><span class="tag {% if x.r.closed_at %}gray{% else %}blue{% endif %}">{{ x.r.status|human:"route_status" }}</span></td>
+    <td>{% if x.r.notified_at %}<span class="tag green">да</span>{% else %}<span class="tag gray">нет</span>{% endif %}</td>
+    <td>{% if x.r.booked_at %}<span class="tag green">{{ x.r.booked_at|date:"d.m" }}</span>{% else %}<span class="tag amber">нет</span>{% endif %}</td>
+    <td class="num">{{ x.r.escalations }}</td>
+    <td class="small nowrap">{{ x.r.created_at|date:"d.m.Y" }}</td></tr>
+  {% empty %}<tr><td colspan="7"><div class="empty">Маршрутов нет</div></td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

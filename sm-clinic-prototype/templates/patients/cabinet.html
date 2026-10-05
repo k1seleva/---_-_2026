@@ -1,0 +1,112 @@
+{% extends "patients/base.html" %}
+{% block title %}Личный кабинет{% endblock %}
+{% block content %}
+<div class="p-layout">
+  <div class="stack">
+    {% include "patients/_sms_hint.html" %}
+
+    {# Первый экран: один главный шаг и понятная шкала маршрута. #}
+    <section class="hero" aria-labelledby="hero-title">
+      {% if hero.kind == 'book' %}
+        <div class="eyebrow">Ваш маршрут после исследования</div>
+        <h1 id="hero-title">{{ hero.title }}</h1>
+        <p class="lead">{{ hero.route.reason }}. {% if hero.overdue %}Рекомендованный срок, <b>{{ hero.due|date:"j E" }}</b>, уже прошёл, но консультация по-прежнему нужна: запишитесь, пожалуйста, в ближайшие дни.{% else %}Врач рекомендовал консультацию{% if hero.due %}, лучше успеть до <b>{{ hero.due|date:"j E" }}</b>{% endif %}. Мы уже подобрали подходящих специалистов.{% endif %}</p>
+        <div class="stepper" aria-label="Этапы маршрута">
+          {% for s in hero.stepper %}<div class="st {{ s.status }}{% if s.skipped %} skipped{% endif %}"><span class="dot">{% if s.status == 'done' %}{% icon "check" "sm" %}{% endif %}</span><b>{{ s.title }}</b><span class="small muted">{% if s.status == 'now' %}сейчас{% elif s.status == 'done' %}готово{% else %}дальше{% endif %}</span></div>{% endfor %}
+        </div>
+        <div class="actions">
+          <a class="btn btn-primary" href="{% url 'patients:book' patient.pk hero.step.id %}">{% icon "calendar" "sm" %}Выбрать время</a>
+          <form method="post" action="{% url 'patients:action' patient.pk %}">{% csrf_token %}<input type="hidden" name="route_id" value="{{ hero.route.id }}"><input type="hidden" name="action" value="callback"><button class="btn btn-light">{% icon "phone" "sm" %}Перезвоните мне</button></form>
+          <form method="post" action="{% url 'patients:action' patient.pk %}">{% csrf_token %}<input type="hidden" name="route_id" value="{{ hero.route.id }}"><input type="hidden" name="action" value="seen_elsewhere"><button class="btn btn-ghost">Консультация уже была</button></form>
+        </div>
+      {% elif hero.kind == 'visit' %}
+        <div class="eyebrow">Ваш маршрут</div>
+        <h1 id="hero-title">{{ hero.title }}</h1>
+        {% if hero.appointment %}<p class="lead"><b>{{ hero.appointment.starts|date:"j E, l, H:i" }}</b> · {{ hero.appointment.doctor_name }} · {{ hero.appointment.location }}</p>{% else %}<p class="lead">{{ hero.step.status_display }}</p>{% endif %}
+        <div class="stepper" aria-label="Этапы маршрута">
+          {% for s in hero.stepper %}<div class="st {{ s.status }}{% if s.skipped %} skipped{% endif %}"><span class="dot">{% if s.status == 'done' %}{% icon "check" "sm" %}{% endif %}</span><b>{{ s.title }}</b><span class="small muted">{% if s.status == 'now' %}сейчас{% elif s.status == 'done' %}готово{% else %}дальше{% endif %}</span></div>{% endfor %}
+        </div>
+        {% if hero.appointment %}<div class="actions">
+          <form method="post" action="{% url 'patients:action' patient.pk %}">{% csrf_token %}<input type="hidden" name="route_id" value="{{ hero.route.id }}"><input type="hidden" name="action" value="confirm"><button class="btn btn-primary">{% icon "check" "sm" %}Подтвердить визит</button></form>
+          <form method="post" action="{% url 'patients:action' patient.pk %}">{% csrf_token %}<input type="hidden" name="route_id" value="{{ hero.route.id }}"><input type="hidden" name="action" value="reschedule"><button class="btn btn-light">Перенести</button></form>
+        </div>{% endif %}
+      {% else %}
+        <div class="eyebrow">Здравствуйте, {{ patient.display_name }}</div>
+        <h1 id="hero-title">{{ hero.title }}</h1>
+        <p class="lead">Когда появится результат исследования или подойдёт срок визита, мы пришлём уведомление и покажем здесь, что сделать.</p>
+      {% endif %}
+    </section>
+
+    <div class="card">
+      <nav class="tabs" aria-label="Разделы кабинета">
+        {% for code, title in tabs %}<a href="?tab={{ code }}" class="{% if tab == code %}active{% endif %}" {% if tab == code %}aria-current="page"{% endif %}>{{ title }}{% if code == 'notifications' and unread %}<span class="count">{{ unread }}</span>{% endif %}</a>{% endfor %}
+      </nav>
+
+      {% if tab == 'appointments' %}
+        {% for a in upcoming %}
+        <div class="list-row">
+          <div style="min-width:64px;text-align:center"><div style="font-size:24px;font-weight:800;line-height:1">{{ a.starts|date:"j" }}</div><div class="small muted">{{ a.starts|date:"M" }}</div></div>
+          <div class="grow"><b>{{ a.starts|date:"H:i" }} · {{ a.doctor_name }}</b><div class="small muted">{{ a.specialty_code|human:"specialty" }} · {% if a.format == 'online' %}онлайн{% else %}{{ a.location }}{% endif %}</div></div>
+          <span class="tag {% if a.status == 'confirmed' %}green{% else %}blue{% endif %}">{{ a.status_display }}</span>
+        </div>
+        {% empty %}
+        <div class="empty"><div class="circle">{% icon "calendar" "lg" %}</div><div class="t">Предстоящих записей нет</div>
+          {% if hero.kind == 'book' %}<a class="btn btn-primary mt-s" href="{% url 'patients:book' patient.pk hero.step.id %}">Записаться по рекомендации</a>{% else %}<div>Запишитесь к врачу или на исследование</div>{% endif %}</div>
+        {% endfor %}
+        {% if past %}<details class="mt"><summary class="small"><b>Прошедшие визиты</b> · {{ past|length }}</summary>
+          {% for a in past %}<div class="list-row small"><span class="grow">{{ a.starts|date:"d.m.Y H:i" }} · {{ a.doctor_name }}</span><span class="tag gray">{{ a.status_display }}</span></div>{% endfor %}</details>{% endif %}
+
+      {% elif tab == 'results' %}
+        {% for d in documents %}
+        <a class="list-row" href="{% url 'patients:result' patient.pk d.id %}" style="color:inherit;text-decoration:none">
+          <span class="circle">{% icon "scan" "sm" %}</span>
+          <span class="grow"><b>{{ d.study_type|default:"Исследование" }}</b><span class="small muted" style="display:block">{{ d.study_date|date:"j E Y"|default:"дата не указана" }}{% if d.status != 'processed' %} · результат готовится{% endif %}</span></span>
+          <span class="btn btn-sm btn-light">Открыть</span>
+        </a>
+        {% empty %}<div class="empty"><div class="circle">{% icon "scan" "lg" %}</div><div class="t">Результатов пока нет</div><div>Когда результат будет готов, мы пришлём уведомление</div></div>{% endfor %}
+
+      {% elif tab == 'routes' %}
+        {% for r in routes %}
+        <div class="result">
+          <div class="row between"><span class="title">{{ r.reason }}</span><span class="tag {% if r.is_open %}blue{% elif r.status == 'completed' %}green{% else %}gray{% endif %}">{{ r.status_display }}</span></div>
+          <ul class="timeline mt">{% for s in r.steps %}{% if s.status != 'cancelled' %}
+            <li class="{% if s.status == 'done' %}done{% elif s.status == 'awaiting_booking' or s.status == 'booked' %}active{% elif s.status == 'skipped' %}skipped{% endif %}"><span class="dot"></span>
+              <b>{{ s.title }}</b>{% if s.specialty_title %} <span class="small muted">· {{ s.specialty_title }}</span>{% endif %}
+              <div class="small muted">{{ s.status_display }}{% if s.due_date and s.status != 'done' and s.status != 'skipped' %} · лучше до {{ s.due_date|date:"j E" }}{% endif %}</div>
+              {% if s.status == 'awaiting_booking' and s.step_type != 'hospitalization_referral' and r.is_open %}<a class="btn btn-sm btn-primary mt-s" href="{% url 'patients:book' patient.pk s.id %}">Выбрать время</a>{% endif %}
+            </li>{% endif %}{% endfor %}</ul>
+        </div>
+        {% empty %}<div class="empty"><div class="circle">{% icon "route" "lg" %}</div><div class="t">Маршрутов нет</div></div>{% endfor %}
+
+      {% else %}
+        {% include "patients/_push_preview.html" %}
+        <div id="all-notices">
+        {% if unread %}<form method="post" action="{% url 'patients:notifications_read' patient.pk %}" data-ajax="all-notices" class="row" style="justify-content:flex-end">{% csrf_token %}<input type="hidden" name="next" value="?tab=notifications"><button class="btn btn-sm btn-ghost">Прочитать все</button></form>{% endif %}
+        {% for n in notifications %}
+        <div class="notice{% if not n.read_at %} unread{% endif %}">
+          <div class="row" style="gap:10px;align-items:flex-start;flex-wrap:nowrap"><span class="circle" style="width:36px;height:36px;border-radius:50%;background:var(--brand-soft);color:var(--brand-ink);display:grid;place-items:center;flex:none">{% icon n.icon "sm" %}</span>
+            <div class="grow"><div class="row between"><a class="title" href="{% url 'patients:notification_open' patient.pk n.pk %}" style="color:inherit">{{ n.title }}</a><span class="small muted">{{ n.created_at|ago }}</span></div>
+              <div>{{ n.body }}</div>
+              {% if n.actions %}<div class="row mt-s">{% for b in n.actions %}<form method="post" action="{% url 'patients:action' patient.pk %}">{% csrf_token %}<input type="hidden" name="route_id" value="{{ n.route_id }}"><input type="hidden" name="action" value="{{ b.action }}"><button class="btn btn-sm {% if forloop.first %}btn-primary{% else %}btn-light{% endif %}">{{ b.label }}</button></form>{% endfor %}</div>{% endif %}
+            </div></div>
+        </div>
+        {% empty %}<div class="empty"><div class="circle">{% icon "bell" "lg" %}</div><div class="t">Уведомлений нет</div></div>{% endfor %}
+        </div>
+        {% if outbox %}<details class="mt small"><summary><b>Что ушло на телефон</b> (push, SMS, звонки — для демонстрации)</summary>
+          <div class="table-wrap"><table><thead><tr><th>Канал</th><th>Текст</th><th>Статус</th></tr></thead>
+          {% for n in outbox %}<tr><td>{{ n.channel|human:"channel" }}</td><td>{{ n.body|truncatechars:90 }}</td>
+            <td><span class="tag {% if n.status == 'sent' %}green{% elif n.status == 'suppressed' %}amber{% else %}gray{% endif %}" title="{{ n.status_reason }}">{{ n.get_status_display }}</span></td></tr>{% endfor %}</table></div></details>{% endif %}
+      {% endif %}
+    </div>
+
+    <div class="card" id="faq">
+      <h2>Частые вопросы</h2>
+      <details><summary><b>Почему мне пришло уведомление?</b></summary><p class="muted mt-s">В заключении исследования врач отметил изменение, по которому рекомендована консультация специалиста. Мы напоминаем, чтобы вы не потеряли время.</p></details>
+      <details class="mt-s"><summary><b>Это диагноз?</b></summary><p class="muted mt-s">Нет. Заключение исследования — не диагноз. Что это значит для вас и нужно ли лечение, решает врач на консультации.</p></details>
+      <details class="mt-s"><summary><b>Как перестать получать SMS или звонки?</b></summary><p class="muted mt-s">В разделе «Как сообщать» выберите удобные каналы для каждого типа сообщений. Сообщения в личном кабинете остаются всегда.</p></details>
+    </div>
+  </div>
+
+  {% include "patients/_side.html" %}
+</div>
+{% endblock %}

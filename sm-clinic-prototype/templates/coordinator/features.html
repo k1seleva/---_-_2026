@@ -1,0 +1,53 @@
+{% extends "workspace/base.html" %}
+{% block title %}Признаки и проверки{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Аналитика</div><h1>Признаки и проверки{% if clinic_title %}: {{ clinic_title }}{% endif %}</h1></div></div>
+{% include "coordinator/_analytics_tabs.html" %}
+<div class="grid grid-4">
+  <div class="kpi-tile"><div class="label">Протоколов разобрано</div><div class="value">{{ features.documents }}</div><div class="foot">фрагментов {{ features.segments }}, подсвечено {{ features.highlighted }}</div></div>
+  <div class="kpi-tile red"><div class="label">С экстренной находкой</div><div class="value">{{ features.emergency_documents }}</div></div>
+  <div class="kpi-tile amber"><div class="label">Изменение не вынесено в заключение</div><div class="value">{{ features.not_in_conclusion_documents }}</div></div>
+  <div class="kpi-tile amber"><div class="label">Формулировки с сомнением</div><div class="value">{{ features.uncertain_documents }}</div></div>
+</div>
+<div class="card mt">
+  <div class="card-head"><h2>{% icon "route" %} Выявленные триггеры</h2><span class="small muted">по актуальным версиям протоколов</span></div>
+  <div class="trig-summary">
+    <div class="trig-total"><b>{{ trigger_stats.triggers }}</b><span>триггеров всего</span></div>
+    {% for t in trigger_stats.by_type %}<div class="trig-kpi tg-{{ t.type }}"><b>{{ t.count }}</b><span>{{ t.title }}</span></div>{% endfor %}
+    <div class="trig-kpi"><b>{% if trigger_stats.share is not None %}{{ trigger_stats.share }}%{% else %}—{% endif %}</b><span>протоколов с триггером ({{ trigger_stats.with_triggers }} из {{ trigger_stats.documents }})</span></div>
+  </div>
+  {% if trigger_stats.markers %}<div class="tags mt-s">{% for m in trigger_stats.markers %}<span class="tag gray"><i class="lg lg-{{ m.type }}"></i>{{ m.title }}: {{ m.count }}</span>{% endfor %}</div>{% endif %}
+  {% if trigger_stats.ai_used %}<div class="trig-summary mt-s source-summary">
+    {% for src in trigger_stats.by_source %}<div class="trig-kpi src-{{ src.source }}"><span class="src-title">{{ src.title }}</span><b>триггеры {{ src.triggers }} · маркеры {{ src.markers }}</b></div>{% endfor %}
+  </div>{% endif %}
+  {% if advice_stats.reviewed %}<p class="small mt-s">Советы ИИ-агента оценены координатором: {{ advice_stats.reviewed }} · принято {{ advice_stats.by_verdict.accept }} · отклонено {{ advice_stats.by_verdict.reject }} · скорректировано {{ advice_stats.by_verdict.correct }}.</p>{% endif %}
+  <style>{{ evidence_css }}</style>
+</div>
+<div class="grid grid-2 mt" style="align-items:start">
+  <div class="card">
+    <h2>Что подсвечивает система</h2>
+    <p class="small muted">Подсветка объясняет, почему фрагмент заметен. Это не оценка важности: порядок показа выбирает врач в «Моих приоритетах».</p>
+    {% with top=features.documents %}{% for t in features.types %}
+    <div class="bar-row" style="grid-template-columns:200px 1fr 70px"><span>{{ t.title }}</span><div class="bar-track" style="height:14px"><div class="bar-fill soft" style="width:{{ t.documents|width:top }}%"></div></div><span class="v">{{ t.documents }} <small>прот.</small></span></div>
+    {% empty %}<p class="muted">Нет данных</p>{% endfor %}{% endwith %}
+  </div>
+  <div class="card">
+    <h2>Частые находки</h2>
+    {% with top=features.top_findings.0.count %}{% for f in features.top_findings %}
+    <div class="bar-row" style="grid-template-columns:200px 1fr 50px"><span>{{ f.title }}</span><div class="bar-track" style="height:14px"><div class="bar-fill" style="width:{{ f.count|width:top }}%"></div></div><span class="v">{{ f.count }}</span></div>
+    {% empty %}<p class="muted">Нет данных</p>{% endfor %}{% endwith %}
+    <h3 class="mt">Контроль ИИ-агента</h3>
+    <p class="small">Запусков агента: <b>{{ features.grounding.llm_runs }}</b> · отброшено ответов без цитаты из текста: <b>{{ features.grounding.rejected }}</b> · попыток убрать подсветку со значимого фрагмента: <b>{{ features.grounding.hidden_ignored }}</b> · фрагментов, пропущенных агентом и размеченных правилами: <b>{{ features.grounding.missing_segments }}</b>.</p>
+  </div>
+</div>
+<div class="card mt">
+  <div class="card-head"><h2>Проверка рекомендаций</h2><a class="small" href="{% url 'coordinator:audits' %}">Все обсуждения</a></div>
+  <div class="grid grid-2">
+    <div><div class="table-wrap"><table><thead><tr><th>Вердикт</th><th class="num">Проверок</th></tr></thead>
+      {% for v in audit_stats.verdicts %}<tr><td>{{ v.title }}</td><td class="num">{{ v.count }}</td></tr>{% endfor %}</table></div>
+      <p class="small mt-s">Ждут решения координатора: <b>{{ audit_stats.open }}</b></p></div>
+    <div><h3>Частые замечания</h3>
+      <ul class="small">{% for t in audit_stats.by_type %}<li>{{ t.title }}: {{ t.count }}</li>{% empty %}<li class="muted">Нет данных</li>{% endfor %}</ul></div>
+  </div>
+</div>
+{% endblock %}

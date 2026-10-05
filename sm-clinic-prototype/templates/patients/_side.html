@@ -1,0 +1,22 @@
+{# Правая колонка как в ЛК СМ-Клиники: город и запись, затем карточки-действия с иконкой в светло-зелёном круге. #}
+<aside>
+  <div class="side-card">
+    <div class="row between"><span class="row" style="gap:6px">{% icon "map-pin" "sm" %}<b>Москва</b></span></div>
+    <div class="stack" style="margin-top:12px">
+      {% if hero.kind == 'book' %}<a class="btn btn-primary btn-block" href="{% url 'patients:book' patient.pk hero.step.id %}">Записаться по маршруту</a>
+      {% else %}<a class="btn btn-primary btn-block" href="#">Записать себя</a>{% endif %}
+      <a class="btn btn-light btn-block" href="#">Записать другого человека</a>
+    </div>
+  </div>
+  <div class="side-card action-list">
+    <a class="action" href="{% url 'patients:cabinet' patient.pk %}?tab=notifications"><span class="circle">{% icon "bell" %}</span><span>Уведомления<span class="sub">{% if unread %}Новых: {{ unread }}{% else %}Всё прочитано{% endif %}</span></span>{% if unread %}<span class="pill red">{{ unread }}</span>{% endif %}</a>
+    <a class="action" href="{% url 'patients:settings' patient.pk %}"><span class="circle">{% icon "settings" %}</span><span>Как сообщать<span class="sub">Push, SMS или звонок</span></span></a>
+    <a class="action" href="{% url 'patients:cabinet' patient.pk %}?tab=results"><span class="circle">{% icon "scan" %}</span><span>Мои исследования<span class="sub">Результаты простыми словами</span></span></a>
+    <a class="action" href="#faq"><span class="circle">{% icon "help" %}</span><span>Частые вопросы</span></a>
+    <a class="action" href="#"><span class="circle">{% icon "receipt" %}</span><span>Справка на налоговый вычет</span></a>
+    <a class="action" href="#"><span class="circle">{% icon "card" %}</span><span>Оплатить</span></a>
+    <form method="post" action="{% url 'patients:settings' patient.pk %}" class="action" style="padding:0">{% csrf_token %}<input type="hidden" name="op" value="large_text"><input type="hidden" name="value" value="{% if patient.large_text %}0{% else %}1{% endif %}"><input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button class="action" style="width:100%;background:none;justify-content:flex-start" aria-pressed="{% if patient.large_text %}true{% else %}false{% endif %}"><span class="circle">{% icon "text-size" %}</span><span style="text-align:left">Крупный шрифт<span class="sub">{% if patient.large_text %}Включён{% else %}Выключен{% endif %}</span></span></button></form>
+  </div>
+  <div class="side-card small muted">{% icon "shield" "sm" %} Сервис подсказывает следующий шаг по рекомендациям врача. Он не ставит диагноз и не назначает лечение.</div>
+</aside>

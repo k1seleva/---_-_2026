@@ -1,0 +1,35 @@
+{% extends "workspace/base.html" %}
+{% block title %}Метки{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Настройки</div><h1>Метки</h1></div></div>
+<p class="muted">Метка отвечает на вопрос «что с этим протоколом» с одного взгляда. Системные метки ставит сама система и объясняет ими категорию; свои метки координатор ставит вручную. Красный цвет зарезервирован за экстренным, чтобы он не терял смысл.</p>
+
+<div class="card">
+  <h2>Категории входящих</h2>
+  <p class="small muted">У протокола одна категория. Правила проверяются сверху вниз, срабатывает первое.</p>
+  <div class="table-wrap"><table><thead><tr><th>Категория</th><th>Что значит и что делать</th></tr></thead>
+    {% for code, title, st in categories %}<tr><td><span class="tag {{ st.0 }}">{{ title }}</span></td><td class="small">{{ st.2 }}</td></tr>{% endfor %}</table></div>
+</div>
+
+<div class="card mt">
+  <h2>Системные метки</h2>
+  <div class="table-wrap"><table><thead><tr><th>Метка</th><th>Когда ставится</th></tr></thead>
+    {% for r in system %}<tr><td><span class="tag {{ r.color }}">{{ r.title }}</span></td><td class="small">{{ r.description }}</td></tr>{% endfor %}</table></div>
+</div>
+
+<div class="grid grid-2 mt" style="align-items:start">
+  <div class="card">
+    <h2>Мои метки</h2>
+    {% for t in custom %}<div class="list-row"><span class="tag custom {{ t.color }}">{{ t.title }}</span><span class="grow small muted">{{ t.description }}</span>
+      <form method="post">{% csrf_token %}<input type="hidden" name="op" value="delete"><input type="hidden" name="id" value="{{ t.pk }}"><button class="btn btn-sm btn-ghost" aria-label="Удалить метку {{ t.title }}">{% icon "x" "sm" %}</button></form></div>
+    {% empty %}<p class="muted">Своих меток пока нет.</p>{% endfor %}
+  </div>
+  <form class="card" method="post">{% csrf_token %}
+    <h2>Новая метка</h2>
+    <label for="tt">Название</label><input id="tt" name="title" maxlength="64" placeholder="Например: Нужен переводчик" required>
+    <label for="tc">Цвет</label><select id="tc" name="color">{% for c, t in colors %}<option value="{{ c }}">{{ t }}</option>{% endfor %}</select>
+    <label for="td">Описание</label><input id="td" name="description" maxlength="255" placeholder="Когда ставить эту метку">
+    <p class="mt-s"><button class="btn btn-primary">{% icon "plus" "sm" %}Создать метку</button></p>
+  </form>
+</div>
+{% endblock %}

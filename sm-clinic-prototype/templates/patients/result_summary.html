@@ -1,0 +1,45 @@
+{% extends "patients/base.html" %}
+{% block title %}Результат исследования{% endblock %}
+{% block content %}
+<div class="p-layout">
+  <div class="stack">
+    <div><a class="small" href="{% url 'patients:cabinet' patient.pk %}?tab=results">← Мои исследования</a>
+      <h1 class="mt-s">{{ doc.study_type|default:"Исследование" }}</h1>
+      <p class="muted">{% if doc.study_date %}{{ doc.study_date|isodate|date:"j E Y" }}{% endif %}{% if doc.location_code %} · {{ doc.location_code|human:"location" }}{% endif %}</p></div>
+
+    {% if emergency %}
+    <div class="note red"><b>Врач клиники свяжется с вами в ближайшее время.</b> Держите телефон рядом. Если самочувствие ухудшится, звоните 103.</div>
+    {% endif %}
+
+    {% if step %}
+    <section class="hero">
+      <div class="eyebrow">Что делать дальше</div>
+      <h2 style="margin:6px 0">{{ step.title }}{% if specialty %}: {{ specialty|lower }}{% endif %}</h2>
+      <p class="muted">Врач, проводивший исследование, рекомендовал консультацию{% if step.due_date %}. Лучше успеть до {{ step.due_date|date:"j E" }}{% endif %}.</p>
+      <div class="actions">{% if step.status == 'awaiting_booking' %}<a class="btn btn-primary" href="{% url 'patients:book' patient.pk step.id %}">{% icon "calendar" "sm" %}Выбрать время</a>{% endif %}</div>
+    </section>
+    {% endif %}
+
+    <div class="card">
+      <h2>Что увидели и что это значит</h2>
+      {% for e in explained %}
+      <div class="explain">
+        <span class="circle">{% icon "scan" "sm" %}</span>
+        <div><div class="what">{{ e.title }}</div>
+          <p class="mb-0">{{ e.explanation }}</p>
+          {% if e.uncertain %}<p class="small muted mb-0">Врач написал это с оговоркой: точнее скажет специалист на консультации.</p>{% endif %}
+          {% if e.quote %}<details class="small mt-s"><summary>Как это записано в протоколе</summary><div class="quote-src">«{{ e.quote }}»</div></details>{% endif %}</div>
+      </div>
+      {% empty %}
+      <div class="empty"><div class="circle">{% icon "check" "lg" %}</div><div class="t">Изменений, по которым нужна консультация, система не отметила</div><div>Окончательно результат оценивает ваш врач.</div></div>
+      {% endfor %}
+    </div>
+
+    {% if doc.recommendations %}<div class="card"><h3>Рекомендации врача, проводившего исследование</h3><ul>{% for r in doc.recommendations %}<li>{{ r.text }}</li>{% endfor %}</ul></div>{% endif %}
+
+    <div class="note">{% icon "shield" "sm" %} Заключение исследования — не диагноз. Объяснения выше написаны врачами клиники для пациентов, чтобы было понятно, о чём речь. Что делать именно вам, решает лечащий врач.</div>
+    <div><a class="btn btn-light" href="{% url 'patients:result_full' patient.pk doc.id %}">{% icon "file" "sm" %}Полный текст протокола</a></div>
+  </div>
+  {% include "patients/_side.html" %}
+</div>
+{% endblock %}

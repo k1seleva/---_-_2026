@@ -1,0 +1,38 @@
+{% extends "patients/base.html" %}
+{% block title %}Как сообщать{% endblock %}
+{% block content %}
+<div class="p-layout">
+  <div class="stack">
+    <div><a class="small" href="{% url 'patients:cabinet' patient.pk %}">← В личный кабинет</a><h1 class="mt-s">Как нам с вами связываться</h1>
+      <p class="muted">Выберите удобный канал для каждого типа сообщений. В личном кабинете сообщения появляются всегда.</p></div>
+    {% include "patients/_sms_hint.html" %}
+    <form class="card" method="post">{% csrf_token %}<input type="hidden" name="op" value="save">
+      <div class="table-wrap"><table class="matrix">
+        <thead><tr><th>Сообщения</th>
+          <th><span class="channel-head">{% icon "push" %}Push</span></th>
+          <th><span class="channel-head">{% icon "sms" %}SMS</span></th>
+          <th><span class="channel-head">{% icon "phone" %}Звонок</span></th>
+          <th><span class="channel-head">{% icon "user" %}Кабинет</span></th></tr></thead>
+        <tbody>
+        {% for r in rows %}
+        <tr><td><b>{{ r.title }}</b><div class="small muted">{{ r.hint }}</div></td>
+          <td><label class="switch"><input type="checkbox" name="{{ r.group }}_push" value="1" {% if r.push %}checked{% endif %} aria-label="{{ r.title }}: push"><span></span></label></td>
+          <td><label class="switch"><input type="checkbox" name="{{ r.group }}_sms" value="1" {% if r.sms %}checked{% endif %} {% if not has_phone %}disabled{% endif %} aria-label="{{ r.title }}: SMS"><span></span></label></td>
+          <td><label class="switch"><input type="checkbox" name="{{ r.group }}_call" value="1" {% if r.call %}checked{% endif %} {% if not has_phone %}disabled{% endif %} aria-label="{{ r.title }}: звонок"><span></span></label></td>
+          <td><label class="switch" title="Всегда включено"><input type="checkbox" checked disabled aria-label="{{ r.title }}: личный кабинет, всегда"><span></span></label></td></tr>
+        {% endfor %}
+        </tbody></table></div>
+      <div class="note mt">{% icon "clock" "sm" %} Push включены по умолчанию. Звоним только с 9:00 до 21:00. Напоминания ночью не отправляем: они сразу видны в личном кабинете. Подтверждение записи приходит сразу после записи.</div>
+      {% if not has_phone %}<p class="small muted mt-s">Чтобы получать SMS и звонки, добавьте номер телефона в профиле.</p>{% else %}<p class="small muted mt-s">Номер для SMS и звонков: {{ patient.phone_masked }}</p>{% endif %}
+      <p class="mt"><button class="btn btn-primary">Сохранить</button></p>
+    </form>
+    <div class="card">{% include "patients/_push_preview.html" %}</div>
+    <div class="card">
+      <div class="row between"><div><b>Крупный шрифт</b><div class="small muted">Увеличивает текст во всём кабинете</div></div>
+        <form method="post">{% csrf_token %}<input type="hidden" name="op" value="large_text"><input type="hidden" name="value" value="{% if patient.large_text %}0{% else %}1{% endif %}">
+          <button class="btn {% if patient.large_text %}btn-primary{% else %}btn-light{% endif %}" aria-pressed="{% if patient.large_text %}true{% else %}false{% endif %}">{% if patient.large_text %}Включён{% else %}Включить{% endif %}</button></form></div>
+    </div>
+  </div>
+  {% include "patients/_side.html" %}
+</div>
+{% endblock %}

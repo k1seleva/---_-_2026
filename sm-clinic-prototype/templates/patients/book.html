@@ -1,0 +1,18 @@
+{% extends "patients/base.html" %}
+{% block title %}Запись{% endblock %}
+{% block content %}
+<a class="small" href="{% url 'patients:cabinet' patient.pk %}">← В личный кабинет</a>
+<h1 class="mt-s">Выберите удобное время</h1>
+<p class="muted">{{ step.title }}{% if specialty %} · {{ specialty }}{% endif %}{% if step.due_date %} · лучше до {{ step.due_date|date:"j E" }}{% endif %}. Показаны только врачи нужного профиля, искать самостоятельно не нужно.</p>
+<div class="slots mt">
+  {% for s in slots %}
+  <form class="slot" method="post">{% csrf_token %}<input type="hidden" name="slot_id" value="{{ s.id }}">
+    <div class="when">{{ s.starts|date:"j E, H:i" }}</div>
+    <div class="small muted">{{ s.starts|date:"l" }}</div>
+    <div class="mt-s">{% if s.format == 'online' %}<span class="tag blue">онлайн</span>{% else %}{% icon "map-pin" "sm" %} {{ s.location }}{% endif %}</div>
+    <div class="small muted">{{ s.doctor }}</div>
+    <button class="btn btn-primary btn-block mt-s">Записаться</button>
+  </form>
+  {% empty %}<div class="card"><div class="empty"><div class="t">Свободного времени сейчас нет</div><div>Координатор позвонит и подберёт время</div></div></div>{% endfor %}
+</div>
+{% endblock %}

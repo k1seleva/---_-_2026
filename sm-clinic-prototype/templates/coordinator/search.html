@@ -1,0 +1,13 @@
+{% extends "workspace/base.html" %}
+{% block title %}Поиск{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Поиск{% if q %}: «{{ q }}»{% endif %}</h1></div></div>
+{% if not q %}<div class="card"><div class="empty">Введите ФИО, номер карты, имя файла или тип исследования в строке поиска вверху</div></div>{% else %}
+<div class="card"><h2>Пациенты</h2>
+  {% for p in patients %}<div class="list-row"><span class="avatar">{{ p.display_name|initials }}</span><span class="grow"><b>{{ p.display_name }}</b><span class="small muted" style="display:block">карта {{ p.external_mis_id }}{% if p.birth_year %} · {{ p.birth_year }} г. р.{% endif %}</span></span>
+    <a class="btn btn-sm btn-light" href="{% url 'coordinator:routes' %}?status=all&patient={{ p.id }}">Маршруты пациента</a></div>
+  {% empty %}<p class="muted">Не найдено</p>{% endfor %}</div>
+{% if placeholders %}<div class="card mt"><h2>Обезличенные</h2>{% for p in placeholders %}<div class="list-row"><span class="tag violet">{{ p.display_name }}</span><span class="grow small muted">«{{ p.card_hint }}»</span><a class="small" href="{% url 'coordinator:unmatched' %}">Разобрать</a></div>{% endfor %}</div>{% endif %}
+<div class="card mt"><h2>Протоколы</h2>{% include "coordinator/_case_table.html" with rows=cases %}</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,30 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Маршрут пациента{% endblock %} · СМ-Клиника</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/sm.css' %}">
+  {% block head %}{% endblock %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+{# Полоса прототипа: модельное время и переход между ролями. В пилоте её нет. #}
+<div class="demo-bar"><div class="wrap">
+  <span>Прототип · модельное время <b>{{ model_now|date:"d.m.Y H:i" }}</b></span>
+  {% for h, label in sim_steps %}
+  <form method="post" action="/sim/advance/">{% csrf_token %}<input type="hidden" name="hours" value="{{ h }}"><input type="hidden" name="next" value="{{ request.get_full_path }}"><button title="Сдвинуть время и прогнать таймеры маршрутов">{{ label }}</button></form>
+  {% endfor %}
+  <form method="post" action="/sim/reset/">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button title="Вернуть реальное время">сбросить</button></form>
+  <span class="roles"><a href="/">Роли</a><a href="/patient/">Пациент</a><a href="/coordinator/">Координатор</a><a href="/doctor/">Врач</a></span>
+</div></div>
+{% block body %}
+<main class="wrap landing">
+  {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+{% endblock %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

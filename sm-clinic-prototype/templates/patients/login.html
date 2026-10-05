@@ -1,0 +1,24 @@
+{% extends "base.html" %}{% load static %}
+{% block title %}Вход в личный кабинет{% endblock %}
+{% block body %}
+<header class="p-header"><div class="wrap"><span class="p-logo"><span class="mark">СМ</span><span>СМ-Клиника</span></span></div></header>
+<main class="wrap p-main">
+  {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+  <div class="login-box card">
+    <h1>Вход в личный кабинет</h1>
+    <p class="muted">Здесь ваши результаты исследований, рекомендации врача и запись на приём.</p>
+    {% if error %}<div class="note red" role="alert">{{ error }}</div>{% endif %}
+    <form method="post" novalidate>{% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <label for="card">Номер амбулаторной карты</label>
+      <input id="card" name="card" value="{{ card }}" autocomplete="username" autocapitalize="characters" required placeholder="Например, АК-0001">
+      <label for="password">Пароль</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+      <button class="btn btn-primary btn-block mt">Войти</button>
+    </form>
+    <p class="small muted mt">Номер карты есть в договоре и на чеке. Нет пароля или забыли? Позвоните в регистратуру: пароль выдают только лично пациенту.</p>
+    <p class="small muted">В пилоте вход будет через личный кабинет СМ-Клиники или по коду из SMS.</p>
+    {% if demo %}<div class="note blue small">Демо-вход: карта <b>{{ demo.card }}</b>, пароль <b>{{ demo.password }}</b>. У всех демо-пациентов одинаковый пароль. Подсказка видна только в режиме разработки.</div>{% endif %}
+  </div>
+</main>
+{% endblock %}

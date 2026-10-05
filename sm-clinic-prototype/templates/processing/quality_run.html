@@ -1,0 +1,133 @@
+{% extends "workspace/base.html" %}
+{% block title %}{{ run.title|default:"Проверка качества" }}{% endblock %}
+{% block head %}{% if run.status == 'queued' or run.status == 'running' %}<meta http-equiv="refresh" content="3">{% endif %}{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs"><a href="{% url 'processing:quality' %}">Качество разбора</a></div>
+  <h1>{{ run.title|default:"Проверка без названия" }}</h1>
+  <div class="muted">{{ run.created_at|date:"j E, H:i" }} · {{ run.files_total }} {{ run.files_total|ru_plural:"протокол,протокола,протоколов" }}{% if run.labels %} · с разметкой эксперта{% endif %}</div></div>
+  <div class="row">{% if run.status == 'done' and run.rows %}<a class="btn btn-light" href="{% url 'processing:quality_csv' run.pk %}">{% icon "file" "sm" %}Отчёт CSV</a>{% endif %}
+    <a class="btn btn-primary" href="{% url 'processing:quality' %}">{% icon "flask" "sm" %}Новая проверка</a></div></div>
+
+{% if run.status == 'queued' or run.status == 'running' %}
+  <div class="card"><h2>Идёт проверка: {{ run.processed }} из {{ run.files_total }}</h2>
+    <div class="progress mt"><i style="width:{{ progress }}%"></i></div>
+    <p class="small muted mt-s">Страница обновится сама. Можно уйти и вернуться: прогон продолжится.</p></div>
+{% elif run.status == 'failed' %}
+  <div class="note red">{% icon "alert" "sm" %} Прогон прерван: {{ run.error }}</div>
+{% else %}
+
+<div class="grid grid-4">
+  <div class="kpi-tile"><div class="label">{% icon "file" "sm" %}Прочитано</div><div class="value">{{ s.read_ok }}<small> из {{ s.protocols }}</small></div>
+    <div class="foot">{% if s.read_errors %}<span style="color:var(--red)">не прочитано: {{ s.read_errors }}</span>{% else %}все файлы открылись{% endif %}</div></div>
+  <div class="kpi-tile {% if s.markup_errors %}amber{% endif %}"><div class="label">{% icon "eye" "sm" %}Разметка без потерь</div><div class="value">{{ s.markup_ok }}</div>
+    <div class="foot">{% if s.markup_errors %}нарушений: {{ s.markup_errors }}{% else %}каждый фрагмент показан врачу ровно один раз{% endif %}</div></div>
+  <div class="kpi-tile"><div class="label">{% icon "route" "sm" %}Сработал триггер</div><div class="value">{{ s.trigger_rate }}<small>%</small></div>
+    <div class="meter"><i style="width:{{ s.trigger_rate|width:100 }}%"></i></div><div class="foot">{{ s.with_trigger }} {{ s.with_trigger|ru_plural:"протокол,протокола,протоколов" }}</div></div>
+  <div class="kpi-tile"><div class="label">{% icon "clock" "sm" %}Время на протокол</div><div class="value">{{ s.avg_ms }}<small> мс</small></div><div class="foot">в среднем, без ИИ-агента</div></div>
+  {% if labelled %}
+  <div class="kpi-tile green"><div class="label">{% icon "check" "sm" %}Точность</div><div class="value">{{ labelled.precision|default_if_none:"—" }}{% if labelled.precision is not None %}<small>%</small>{% endif %}</div><div class="foot">лишних срабатываний: {{ labelled.fp }}</div></div>
+  <div class="kpi-tile green"><div class="label">{% icon "search" "sm" %}Полнота</div><div class="value">{{ labelled.recall|default_if_none:"—" }}{% if labelled.recall is not None %}<small>%</small>{% endif %}</div><div class="foot">пропущено: {{ labelled.fn }}</div></div>
+  <div class="kpi-tile green"><div class="label">{% icon "chart" "sm" %}F1</div><div class="value">{{ labelled.f1|default_if_none:"—" }}{% if labelled.f1 is not None %}<small>%</small>{% endif %}</div><div class="foot">размечено файлов: {{ labelled.files }}</div></div>
+  <div class="kpi-tile {% if labelled.mismatches %}amber{% endif %}"><div class="label">{% icon "alert" "sm" %}Расхождения</div><div class="value">{{ labelled.mismatches|length }}</div><div class="foot">{% if labelled.mismatches %}<a href="?show=mismatch">показать</a>{% else %}совпадает с экспертом{% endif %}</div></div>
+  {% else %}
+  <div class="kpi-tile amber"><div class="label">{% icon "file" "sm" %}Без заключения</div><div class="value">{{ s.no_conclusion }}</div><div class="foot">раздел «Заключение» не найден</div></div>
+  <div class="kpi-tile amber"><div class="label">{% icon "alert" "sm" %}Не вынесено в заключение</div><div class="value">{{ s.not_in_conclusion }}</div><div class="foot">изменение есть только в описании</div></div>
+  <div class="kpi-tile amber"><div class="label">{% icon "help" "sm" %}С сомнением</div><div class="value">{{ s.uncertain }}</div><div class="foot">«?», «нельзя исключить»</div></div>
+  <div class="kpi-tile {% if s.emergency %}red{% endif %}"><div class="label">{% icon "alert" "sm" %}Экстренные</div><div class="value">{{ s.emergency }}</div><div class="foot">в рабочем режиме сразу задача врачу</div></div>
+  {% endif %}
+</div>
+{% if s.triggers_total is not None %}
+<div class="card mt">
+  <div class="card-head"><h2>{% icon "route" %} Выявленные триггеры</h2><span class="small muted">по всей пачке</span></div>
+  <div class="trig-summary">
+    <div class="trig-total"><b>{{ s.triggers_total }}</b><span>триггеров всего</span></div>
+    {% for code, n in s.triggers_by_type %}<div class="trig-kpi tg-{{ code }}"><b>{{ n }}</b><span>{{ code|human:"trigger_type" }}</span></div>{% endfor %}
+    <div class="trig-kpi"><b>{{ s.any_trigger_rate }}%</b><span>протоколов с триггером ({{ s.with_any_trigger }} из {{ s.read_ok }})</span></div>
+    {% if s.trigger_confidence_avg is not None %}<div class="trig-kpi muted-kpi"><b>{{ s.trigger_confidence_avg }}</b><span>средняя уверенность триггера</span></div>{% endif %}
+    <div class="trig-kpi muted-kpi"><b>{{ s.markers_total }}</b><span>маркеров, перекрытий {{ s.overlaps_total }}</span></div>
+    {% if s.corrected_total %}<div class="trig-kpi muted-kpi"><b>{{ s.corrected_total }}</b><span>найдено после исправления опечатки или раскладки</span></div>{% endif %}
+  </div>
+  {% if s.markers_by_type %}<div class="tags mt-s">{% for code, n in s.markers_by_type %}<span class="tag gray"><i class="lg lg-{{ code }}"></i>{{ code|human:"marker_type" }}: {{ n }}</span>{% endfor %}</div>{% endif %}
+  {% if s.llm.extraction.ok or s.llm.markup.ok or s.llm.extraction.error or s.llm.markup.error %}
+  <h3 class="mt">Кто нашёл: словарь и ИИ-агент</h3>
+  <div class="trig-summary source-summary">
+    <div class="trig-kpi src-both"><span class="src-title">Словарь и ИИ-агент согласны</span><b>триггеры {{ s.triggers_by_source.both|default:0 }} · маркеры {{ s.markers_by_source.both|default:0 }}</b></div>
+    <div class="trig-kpi src-rules"><span class="src-title">Только словарь</span><b>триггеры {{ s.triggers_by_source.rules|default:0 }} · маркеры {{ s.markers_by_source.rules|default:0 }}</b></div>
+    <div class="trig-kpi src-llm"><span class="src-title">Только ИИ-агент</span><b>триггеры {{ s.triggers_by_source.llm|default:0 }} · маркеры {{ s.markers_by_source.llm|default:0 }}</b><span>протоколов с таким триггером: {{ s.with_ai_only_trigger|default:0 }}</span></div>
+  </div>
+  <p class="small muted mt-s">Модель ответила: находки заключения {{ s.llm.extraction.ok|default:0 }} из {{ s.markup_ok }}, разметка фрагментов {{ s.llm.markup.ok|default:0 }} из {{ s.markup_ok }}{% if s.llm.extraction.error or s.llm.markup.error %}; с ошибкой {{ s.llm.extraction.error|default:0 }} и {{ s.llm.markup.error|default:0 }}, там разбор только по словарю{% endif %}.</p>
+  {% endif %}
+  <p class="small muted mt-s">«Сработал триггер» выше считает только запуск маршрута. Здесь также экстренные находки и «нужна проверка» (изменение не вынесено в заключение).</p>
+  <style>{{ evidence_css }}</style>
+</div>
+{% endif %}
+{% if not labelled %}<p class="small muted mt-s">Точность и полнота появятся, если приложить разметку эксперта. {% if run.rows %}Шаблон: скачайте <a href="{% url 'processing:quality_csv' run.pk %}">отчёт CSV</a>, заполните колонку expected_rules и запустите проверку ещё раз.{% else %}Загрузите протоколы в «Новую проверку» вместе с labels.csv (file, expected_rules).{% endif %}</p>{% endif %}
+
+<div class="grid grid-2 mt">
+  <div class="card">
+    <div class="card-head"><h2>Какие правила сработали</h2><span class="small muted">протоколов</span></div>
+    {% for code, n in s.rules %}
+    <div class="bar-row" style="grid-template-columns:minmax(0,1.4fr) 1fr 40px"><span class="small">{{ code|human:"rule" }}</span><div class="bar-track"><div class="bar-fill" style="width:{{ n|width:rule_max }}%"></div></div><span class="v">{{ n }}</span></div>
+    {% empty %}<div class="empty"><div class="t">Ни одно правило не сработало</div></div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Проверка рекомендаций</h2><span class="small muted">протоколов</span></div>
+    {% for code, n in s.verdicts %}<div class="list-row"><span class="grow"><span class="tag {% if code == 'sufficient' %}green{% elif code == 'insufficient' %}red{% else %}amber{% endif %}" style="white-space:normal">{{ code|human:"audit_verdict" }}</span></span><b>{{ n }}</b></div>{% endfor %}
+    {% if s.issues %}<h3 class="mt">Замечания</h3>
+    {% for code, n in s.issues %}<div class="list-row small"><span class="grow">{{ code|human:"issue_type" }}</span><b>{{ n }}</b></div>{% endfor %}{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Находки словаря</h2><span class="small muted">протоколов, без отрицаний</span></div>
+    {% for code, n in s.findings %}
+    <div class="bar-row" style="grid-template-columns:minmax(0,1.4fr) 1fr 40px"><span class="small">{{ code|human:"finding" }}</span><div class="bar-track"><div class="bar-fill violet" style="width:{{ n|width:finding_max }}%"></div></div><span class="v">{{ n }}</span></div>
+    {% empty %}<div class="empty"><div class="t">Находок нет</div></div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Подсветки для врача</h2><span class="small muted">фрагментов</span></div>
+    <p class="small muted">Это причины подсветки, а не уровни важности: порядок выбирает врач.</p>
+    <div class="hls">{% for code, n in s.highlights %}<span class="hl {{ code|hl_class }}">{{ code|human:"highlight" }}: {{ n }}</span>{% endfor %}</div>
+  </div>
+</div>
+
+{% if labelled and labelled.per_rule %}
+<div class="card mt">
+  <h2>По правилам относительно разметки</h2>
+  <div class="table-wrap"><table><thead><tr><th>Правило</th><th>Совпало</th><th>Лишнее</th><th>Пропущено</th></tr></thead>
+  {% for code, st in labelled.per_rule %}<tr><td>{{ code|human:"rule" }}</td><td>{{ st.tp }}</td><td>{% if st.fp %}<span class="tag amber">{{ st.fp }}</span>{% else %}0{% endif %}</td><td>{% if st.fn %}<span class="tag red">{{ st.fn }}</span>{% else %}0{% endif %}</td></tr>{% endfor %}
+  </table></div>
+  {% if labelled.not_found %}<p class="small muted mt-s">В разметке есть файлы, которых нет в пачке: {{ labelled.not_found|join:", " }}</p>{% endif %}
+</div>
+{% endif %}
+
+{% if not run.rows %}
+<div class="note blue mt">{% icon "shield" "sm" %} Это сводка прогона без текстов: протоколы остались у владельца, в прототипе хранятся только счётчики и коды правил. Построчный отчёт появится, если загрузить протоколы в «Новую проверку».</div>
+{% else %}
+<div class="card mt">
+  <nav class="tabs" aria-label="Фильтр протоколов">
+    {% for t in tabs %}<a href="?show={{ t.code }}" class="{% if show == t.code %}active{% endif %}">{{ t.title }}<span class="count">{{ t.count }}</span></a>{% endfor %}
+  </nav>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Файл</th><th>Находки и цитаты</th><th>Правила маршрута</th><th>Подсветки</th><th>Рекомендации</th></tr></thead>
+    {% for r in rows %}
+    <tr>
+      <td><b>{{ r.file }}</b><div class="small muted">{{ r.study_type|default:"тип не распознан" }}{% if r.has_conclusion is False %} · <span style="color:var(--amber-ink, #9a6200)">нет заключения</span>{% endif %}</div>
+        {% if r.error %}<div class="small" style="color:var(--red)">{{ r.error }}</div>{% endif %}</td>
+      <td class="small">{% for f in r.findings %}<div{% if f.negated %} class="muted"{% endif %}><b>{{ f.code|human:"finding" }}</b>{% if f.negated %} (отрицание){% endif %}{% if f.uncertain %} (сомнение){% endif %}{% if f.quote %}<div class="quote-src">«{{ f.quote }}»</div>{% endif %}</div>{% empty %}<span class="muted">—</span>{% endfor %}</td>
+      <td class="small">{% for code in r.rules %}<div>{{ code|human:"rule" }}</div>{% empty %}<span class="muted">не сработали</span>{% endfor %}
+        {% if r.expected is not None and r.expected != r.rules %}<div class="mt-s"><span class="tag amber">эксперт: {% for code in r.expected %}{{ code|human:"rule" }}{% if not forloop.last %}; {% endif %}{% empty %}норма{% endfor %}</span></div>{% endif %}</td>
+      <td class="small">{% if r.emergency %}<span class="tag red">экстренно</span> {% endif %}{{ r.highlighted }}{% if r.not_in_conclusion %}<div style="color:var(--amber-ink, #9a6200)">не вынесено: {{ r.not_in_conclusion }}</div>{% endif %}</td>
+      <td class="small">{% if r.audit_verdict %}<span class="tag {% if r.audit_verdict == 'sufficient' %}green{% elif r.audit_verdict == 'insufficient' %}red{% else %}amber{% endif %}">{{ r.audit_verdict|human:"audit_verdict" }}</span>{% endif %}
+        {% for g in r.audit_gaps %}<div class="muted">{{ g }}</div>{% endfor %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="5"><div class="empty"><div class="t">В этом фильтре протоколов нет</div></div></td></tr>{% endfor %}
+  </table></div>
+</div>
+{% endif %}
+
+{% if run.rejected %}
+<details class="card mt"><summary><b>Не вошли в прогон</b> · {{ run.rejected|length }}</summary>
+  {% for r in run.rejected %}<div class="list-row small"><span class="grow">{{ r.file }}</span><span class="muted">{{ r.error }}</span></div>{% endfor %}
+</details>
+{% endif %}
+{% endif %}
+{% endblock %}

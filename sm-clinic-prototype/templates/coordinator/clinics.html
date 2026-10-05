@@ -1,0 +1,35 @@
+{% extends "workspace/base.html" %}
+{% block title %}Аналитика по клиникам{% endblock %}
+{% block content %}
+<div class="page-head"><div><div class="crumbs">Аналитика</div><h1>Сравнение клиник</h1></div></div>
+{% include "coordinator/_analytics_tabs.html" %}
+<div class="grid grid-3">
+  {% for r in rows %}
+  <div class="card">
+    <div class="card-head"><h3>{% icon "building" "sm" %} {{ r.title }}</h3><span class="small muted">{{ r.protocols }} {{ r.protocols|ru_plural:"протокол,протокола,протоколов" }}</span></div>
+    <div class="small muted">Записались за 72 часа</div>
+    <div class="row" style="gap:8px;flex-wrap:nowrap"><div class="meter" style="flex:1;margin:0;height:12px"><i style="width:{{ r.booked_72h_rate|width:100 }}%"></i></div><b style="font-size:20px">{{ r.booked_72h_rate|default_if_none:"—" }}{% if r.booked_72h_rate is not None %}%{% endif %}</b></div>
+    <div class="grid grid-2 mt-s small" style="gap:6px">
+      <div>С находками: <b>{{ r.findings_rate|default_if_none:"—" }}{% if r.findings_rate is not None %}%{% endif %}</b></div>
+      <div>Маршрутов: <b>{{ r.routes }}</b></div>
+      <div>Уведомлены: <b>{{ r.notified_rate|default_if_none:"—" }}{% if r.notified_rate is not None %}%{% endif %}</b></div>
+      <div>Неявки: <b>{{ r.no_show_rate|default_if_none:"—" }}{% if r.no_show_rate is not None %}%{% endif %}</b></div>
+    </div>
+    <div class="tags mt-s">{% if r.emergency %}<span class="tag red">Экстренно: {{ r.emergency }}</span>{% endif %}{% if r.unmatched %}<span class="tag violet">Без пациента: {{ r.unmatched }}</span>{% endif %}{% if r.needs_review %}<span class="tag amber">Нужна проверка: {{ r.needs_review }}</span>{% endif %}{% if r.failed %}<span class="tag amber">Ошибки: {{ r.failed }}</span>{% endif %}</div>
+  </div>
+  {% empty %}<div class="card"><div class="empty">Данных пока нет</div></div>{% endfor %}
+</div>
+
+<div class="card mt">
+  <h2>Таблица для отчёта</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Клиника</th><th class="num">Протоколов</th><th class="num">С находками</th><th class="num">Маршрутов</th><th class="num">Уведомлены</th><th class="num">Записались</th><th class="num">За 72 часа</th><th class="num">Неявки</th><th class="num">Не вовлечены</th><th class="num">Ждут разбора</th></tr></thead>
+    {% for r in rows %}<tr><td><b>{{ r.title }}</b></td><td class="num">{{ r.protocols }}</td><td class="num">{{ r.with_findings }}</td><td class="num">{{ r.routes }}</td>
+      <td class="num">{{ r.notified_rate|default_if_none:"—" }}{% if r.notified_rate is not None %}%{% endif %}</td><td class="num">{{ r.booking_rate|default_if_none:"—" }}{% if r.booking_rate is not None %}%{% endif %}</td>
+      <td class="num">{{ r.booked_72h_rate|default_if_none:"—" }}{% if r.booked_72h_rate is not None %}%{% endif %}</td><td class="num">{{ r.no_show_rate|default_if_none:"—" }}{% if r.no_show_rate is not None %}%{% endif %}</td>
+      <td class="num">{{ r.not_engaged }}</td><td class="num">{{ r.needs_review|add:r.unmatched|add:r.failed|add:r.emergency }}</td></tr>
+    {% empty %}<tr><td colspan="10" class="muted">Нет данных</td></tr>{% endfor %}
+  </table></div>
+  <p class="small muted mt-s">Скорость записи показана долей пациентов, записавшихся за 72 часа от создания маршрута: показатель одинаково читается для большой и маленькой клиники.</p>
+</div>
+{% endblock %}
